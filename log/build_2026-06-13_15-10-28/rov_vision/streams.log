@@ -1,0 +1,31 @@
+[3.446s] Invoking command in '/mnt/c/Users/msı/Desktop/teknofest-akay/src/rov_vision': PYTHONPATH=/mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/rov_vision build --build-base /mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/build install --record /mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/install.log --single-version-externally-managed install_data
+[4.805s] running egg_info
+[4.815s] writing ../../build/rov_vision/rov_vision.egg-info/PKG-INFO
+[4.833s] writing dependency_links to ../../build/rov_vision/rov_vision.egg-info/dependency_links.txt
+[4.844s] writing entry points to ../../build/rov_vision/rov_vision.egg-info/entry_points.txt
+[4.854s] writing requirements to ../../build/rov_vision/rov_vision.egg-info/requires.txt
+[4.872s] writing top-level names to ../../build/rov_vision/rov_vision.egg-info/top_level.txt
+[4.972s] reading manifest file '../../build/rov_vision/rov_vision.egg-info/SOURCES.txt'
+[5.139s] writing manifest file '../../build/rov_vision/rov_vision.egg-info/SOURCES.txt'
+[5.146s] running build
+[5.148s] running build_py
+[5.172s] copying rov_vision/autonomous_driver.py -> /mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/build/lib/rov_vision
+[5.289s] copying rov_vision/video_publisher.py -> /mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/build/lib/rov_vision
+[5.365s] running install
+[5.367s] running install_lib
+[5.497s] copying /mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/build/lib/rov_vision/autonomous_driver.py -> /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages/rov_vision
+[5.670s] copying /mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/build/lib/rov_vision/video_publisher.py -> /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages/rov_vision
+[5.857s] byte-compiling /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages/rov_vision/autonomous_driver.py to autonomous_driver.cpython-310.pyc
+[6.116s] byte-compiling /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages/rov_vision/video_publisher.py to video_publisher.cpython-310.pyc
+[6.304s] running install_data
+[6.351s] copying package.xml -> /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/share/rov_vision
+[6.404s] copying launch/autonomous_driver.launch.py -> /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/share/rov_vision/launch
+[6.466s] running install_egg_info
+[6.475s] removing '/mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages/rov_vision-0.0.0-py3.10.egg-info' (and everything under it)
+[6.521s] Copying ../../build/rov_vision/rov_vision.egg-info to /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages/rov_vision-0.0.0-py3.10.egg-info
+[6.806s] running install_scripts
+[6.938s] Installing autonomous_driver script to /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/rov_vision
+[7.100s] Installing line_follower script to /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/rov_vision
+[7.138s] Installing video_publisher script to /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/rov_vision
+[7.191s] writing list of installed files to '/mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/install.log'
+[7.274s] Invoked command in '/mnt/c/Users/msı/Desktop/teknofest-akay/src/rov_vision' returned '0': PYTHONPATH=/mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/rov_vision build --build-base /mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/build install --record /mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/install.log --single-version-externally-managed install_data

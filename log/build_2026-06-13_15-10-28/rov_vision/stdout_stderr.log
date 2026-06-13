@@ -1,0 +1,29 @@
+running egg_info
+writing ../../build/rov_vision/rov_vision.egg-info/PKG-INFO
+writing dependency_links to ../../build/rov_vision/rov_vision.egg-info/dependency_links.txt
+writing entry points to ../../build/rov_vision/rov_vision.egg-info/entry_points.txt
+writing requirements to ../../build/rov_vision/rov_vision.egg-info/requires.txt
+writing top-level names to ../../build/rov_vision/rov_vision.egg-info/top_level.txt
+reading manifest file '../../build/rov_vision/rov_vision.egg-info/SOURCES.txt'
+writing manifest file '../../build/rov_vision/rov_vision.egg-info/SOURCES.txt'
+running build
+running build_py
+copying rov_vision/autonomous_driver.py -> /mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/build/lib/rov_vision
+copying rov_vision/video_publisher.py -> /mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/build/lib/rov_vision
+running install
+running install_lib
+copying /mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/build/lib/rov_vision/autonomous_driver.py -> /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages/rov_vision
+copying /mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/build/lib/rov_vision/video_publisher.py -> /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages/rov_vision
+byte-compiling /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages/rov_vision/autonomous_driver.py to autonomous_driver.cpython-310.pyc
+byte-compiling /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages/rov_vision/video_publisher.py to video_publisher.cpython-310.pyc
+running install_data
+copying package.xml -> /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/share/rov_vision
+copying launch/autonomous_driver.launch.py -> /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/share/rov_vision/launch
+running install_egg_info
+removing '/mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages/rov_vision-0.0.0-py3.10.egg-info' (and everything under it)
+Copying ../../build/rov_vision/rov_vision.egg-info to /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/python3.10/site-packages/rov_vision-0.0.0-py3.10.egg-info
+running install_scripts
+Installing autonomous_driver script to /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/rov_vision
+Installing line_follower script to /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/rov_vision
+Installing video_publisher script to /mnt/c/Users/msı/Desktop/teknofest-akay/install/rov_vision/lib/rov_vision
+writing list of installed files to '/mnt/c/Users/msı/Desktop/teknofest-akay/build/rov_vision/install.log'

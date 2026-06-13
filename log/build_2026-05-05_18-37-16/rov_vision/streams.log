@@ -1,0 +1,43 @@
+[0.495s] Invoking command in '/home/sevket/teknofest_ws/src/rov_vision': PYTHONPATH=/home/sevket/teknofest_ws/build/rov_vision/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/sevket/teknofest_ws/install/rov_vision/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/rov_vision build --build-base /home/sevket/teknofest_ws/build/rov_vision/build install --record /home/sevket/teknofest_ws/build/rov_vision/install.log --single-version-externally-managed install_data
+[0.621s] running egg_info
+[0.621s] creating ../../build/rov_vision/rov_vision.egg-info
+[0.621s] writing ../../build/rov_vision/rov_vision.egg-info/PKG-INFO
+[0.621s] writing dependency_links to ../../build/rov_vision/rov_vision.egg-info/dependency_links.txt
+[0.622s] writing entry points to ../../build/rov_vision/rov_vision.egg-info/entry_points.txt
+[0.622s] writing requirements to ../../build/rov_vision/rov_vision.egg-info/requires.txt
+[0.622s] writing top-level names to ../../build/rov_vision/rov_vision.egg-info/top_level.txt
+[0.622s] writing manifest file '../../build/rov_vision/rov_vision.egg-info/SOURCES.txt'
+[0.623s] reading manifest file '../../build/rov_vision/rov_vision.egg-info/SOURCES.txt'
+[0.623s] writing manifest file '../../build/rov_vision/rov_vision.egg-info/SOURCES.txt'
+[0.623s] running build
+[0.624s] running build_py
+[0.624s] creating /home/sevket/teknofest_ws/build/rov_vision/build
+[0.624s] creating /home/sevket/teknofest_ws/build/rov_vision/build/lib
+[0.624s] creating /home/sevket/teknofest_ws/build/rov_vision/build/lib/rov_vision
+[0.624s] copying rov_vision/video_publisher.py -> /home/sevket/teknofest_ws/build/rov_vision/build/lib/rov_vision
+[0.624s] copying rov_vision/__init__.py -> /home/sevket/teknofest_ws/build/rov_vision/build/lib/rov_vision
+[0.624s] copying rov_vision/line_follower.py -> /home/sevket/teknofest_ws/build/rov_vision/build/lib/rov_vision
+[0.626s] running install
+[0.626s] running install_lib
+[0.627s] creating /home/sevket/teknofest_ws/install/rov_vision/lib/python3.10/site-packages/rov_vision
+[0.627s] copying /home/sevket/teknofest_ws/build/rov_vision/build/lib/rov_vision/video_publisher.py -> /home/sevket/teknofest_ws/install/rov_vision/lib/python3.10/site-packages/rov_vision
+[0.627s] copying /home/sevket/teknofest_ws/build/rov_vision/build/lib/rov_vision/__init__.py -> /home/sevket/teknofest_ws/install/rov_vision/lib/python3.10/site-packages/rov_vision
+[0.627s] copying /home/sevket/teknofest_ws/build/rov_vision/build/lib/rov_vision/line_follower.py -> /home/sevket/teknofest_ws/install/rov_vision/lib/python3.10/site-packages/rov_vision
+[0.627s] byte-compiling /home/sevket/teknofest_ws/install/rov_vision/lib/python3.10/site-packages/rov_vision/video_publisher.py to video_publisher.cpython-310.pyc
+[0.628s] byte-compiling /home/sevket/teknofest_ws/install/rov_vision/lib/python3.10/site-packages/rov_vision/__init__.py to __init__.cpython-310.pyc
+[0.628s] byte-compiling /home/sevket/teknofest_ws/install/rov_vision/lib/python3.10/site-packages/rov_vision/line_follower.py to line_follower.cpython-310.pyc
+[0.630s] running install_data
+[0.630s] creating /home/sevket/teknofest_ws/install/rov_vision/share/ament_index
+[0.630s] creating /home/sevket/teknofest_ws/install/rov_vision/share/ament_index/resource_index
+[0.630s] creating /home/sevket/teknofest_ws/install/rov_vision/share/ament_index/resource_index/packages
+[0.630s] copying resource/rov_vision -> /home/sevket/teknofest_ws/install/rov_vision/share/ament_index/resource_index/packages
+[0.630s] copying package.xml -> /home/sevket/teknofest_ws/install/rov_vision/share/rov_vision
+[0.630s] creating /home/sevket/teknofest_ws/install/rov_vision/share/rov_vision/launch
+[0.631s] copying launch/line_follower.launch.py -> /home/sevket/teknofest_ws/install/rov_vision/share/rov_vision/launch
+[0.631s] running install_egg_info
+[0.632s] Copying ../../build/rov_vision/rov_vision.egg-info to /home/sevket/teknofest_ws/install/rov_vision/lib/python3.10/site-packages/rov_vision-0.0.0-py3.10.egg-info
+[0.633s] running install_scripts
+[0.645s] Installing line_follower script to /home/sevket/teknofest_ws/install/rov_vision/lib/rov_vision
+[0.645s] Installing video_publisher script to /home/sevket/teknofest_ws/install/rov_vision/lib/rov_vision
+[0.645s] writing list of installed files to '/home/sevket/teknofest_ws/build/rov_vision/install.log'
+[0.659s] Invoked command in '/home/sevket/teknofest_ws/src/rov_vision' returned '0': PYTHONPATH=/home/sevket/teknofest_ws/build/rov_vision/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/sevket/teknofest_ws/install/rov_vision/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/rov_vision build --build-base /home/sevket/teknofest_ws/build/rov_vision/build install --record /home/sevket/teknofest_ws/build/rov_vision/install.log --single-version-externally-managed install_data

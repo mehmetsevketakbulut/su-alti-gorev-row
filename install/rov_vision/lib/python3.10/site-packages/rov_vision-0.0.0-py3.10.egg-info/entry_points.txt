@@ -1,0 +1,5 @@
+[console_scripts]
+autonomous_driver = rov_vision.autonomous_driver:main
+line_follower = rov_vision.line_follower:main
+video_publisher = rov_vision.video_publisher:main
+
