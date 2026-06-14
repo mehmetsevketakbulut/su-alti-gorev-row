@@ -233,7 +233,7 @@ class AutonomousDriverNode(Node):
         # Angular.z → x1 (dönüş)
         # Joystick'te sol=1060, sağ=1940 idi; angular.z pozitif=sola dönüş
         ang_z_clamped = clamp(twist.angular.z, -max_ang, max_ang)
-        x1 = map_value(ang_z_clamped, -max_ang, max_ang, self.PWM_MIN, self.PWM_MAX)
+        x1 = map_value(ang_z_clamped, -max_ang, max_ang, self.PWM_MAX, self.PWM_MIN)
 
         # Linear.x → y1 (ileri/geri)
         # Joystick'te ileri=1060 (eksen ters), geri=1940
