@@ -30,6 +30,7 @@ setup(
             'line_follower = rov_vision.line_follower:main',
             'video_publisher = rov_vision.video_publisher:main',
             'autonomous_driver = rov_vision.autonomous_driver:main',
+            'mission_orbit = rov_vision.mission_orbit:main',
         ],
     },
 )
