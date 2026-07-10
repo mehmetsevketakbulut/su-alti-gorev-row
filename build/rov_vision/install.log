@@ -1,9 +1,11 @@
 /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/video_publisher.py
+/home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/video_mission.py
 /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/mission_orbit.py
 /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/autonomous_driver.py
 /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/__init__.py
 /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/line_follower.py
 /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/__pycache__/video_publisher.cpython-310.pyc
+/home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/__pycache__/video_mission.cpython-310.pyc
 /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/__pycache__/mission_orbit.cpython-310.pyc
 /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/__pycache__/autonomous_driver.cpython-310.pyc
 /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/__pycache__/__init__.cpython-310.pyc

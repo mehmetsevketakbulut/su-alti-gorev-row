@@ -1,0 +1,30 @@
+[0.558s] Invoking command in '/home/sevket/su-alti-gorev-row/src/rov_vision': PYTHONPATH=/home/sevket/su-alti-gorev-row/build/rov_vision/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/rov_vision build --build-base /home/sevket/su-alti-gorev-row/build/rov_vision/build install --record /home/sevket/su-alti-gorev-row/build/rov_vision/install.log --single-version-externally-managed install_data
+[0.682s] running egg_info
+[0.683s] writing ../../build/rov_vision/rov_vision.egg-info/PKG-INFO
+[0.684s] writing dependency_links to ../../build/rov_vision/rov_vision.egg-info/dependency_links.txt
+[0.684s] writing entry points to ../../build/rov_vision/rov_vision.egg-info/entry_points.txt
+[0.684s] writing requirements to ../../build/rov_vision/rov_vision.egg-info/requires.txt
+[0.685s] writing top-level names to ../../build/rov_vision/rov_vision.egg-info/top_level.txt
+[0.686s] reading manifest file '../../build/rov_vision/rov_vision.egg-info/SOURCES.txt'
+[0.687s] writing manifest file '../../build/rov_vision/rov_vision.egg-info/SOURCES.txt'
+[0.687s] running build
+[0.687s] running build_py
+[0.687s] copying rov_vision/video_mission.py -> /home/sevket/su-alti-gorev-row/build/rov_vision/build/lib/rov_vision
+[0.688s] copying rov_vision/mission_orbit.py -> /home/sevket/su-alti-gorev-row/build/rov_vision/build/lib/rov_vision
+[0.689s] running install
+[0.689s] running install_lib
+[0.690s] copying /home/sevket/su-alti-gorev-row/build/rov_vision/build/lib/rov_vision/video_mission.py -> /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision
+[0.690s] copying /home/sevket/su-alti-gorev-row/build/rov_vision/build/lib/rov_vision/mission_orbit.py -> /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision
+[0.691s] byte-compiling /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/video_mission.py to video_mission.cpython-310.pyc
+[0.692s] byte-compiling /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/mission_orbit.py to mission_orbit.cpython-310.pyc
+[0.694s] running install_data
+[0.695s] running install_egg_info
+[0.696s] removing '/home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision-0.0.0-py3.10.egg-info' (and everything under it)
+[0.697s] Copying ../../build/rov_vision/rov_vision.egg-info to /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision-0.0.0-py3.10.egg-info
+[0.699s] running install_scripts
+[0.713s] Installing autonomous_driver script to /home/sevket/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+[0.713s] Installing line_follower script to /home/sevket/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+[0.713s] Installing mission_orbit script to /home/sevket/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+[0.713s] Installing video_publisher script to /home/sevket/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+[0.714s] writing list of installed files to '/home/sevket/su-alti-gorev-row/build/rov_vision/install.log'
+[0.729s] Invoked command in '/home/sevket/su-alti-gorev-row/src/rov_vision' returned '0': PYTHONPATH=/home/sevket/su-alti-gorev-row/build/rov_vision/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/rov_vision build --build-base /home/sevket/su-alti-gorev-row/build/rov_vision/build install --record /home/sevket/su-alti-gorev-row/build/rov_vision/install.log --single-version-externally-managed install_data

@@ -1,0 +1,28 @@
+running egg_info
+writing ../../build/rov_vision/rov_vision.egg-info/PKG-INFO
+writing dependency_links to ../../build/rov_vision/rov_vision.egg-info/dependency_links.txt
+writing entry points to ../../build/rov_vision/rov_vision.egg-info/entry_points.txt
+writing requirements to ../../build/rov_vision/rov_vision.egg-info/requires.txt
+writing top-level names to ../../build/rov_vision/rov_vision.egg-info/top_level.txt
+reading manifest file '../../build/rov_vision/rov_vision.egg-info/SOURCES.txt'
+writing manifest file '../../build/rov_vision/rov_vision.egg-info/SOURCES.txt'
+running build
+running build_py
+copying rov_vision/video_mission.py -> /home/sevket/su-alti-gorev-row/build/rov_vision/build/lib/rov_vision
+copying rov_vision/mission_orbit.py -> /home/sevket/su-alti-gorev-row/build/rov_vision/build/lib/rov_vision
+running install
+running install_lib
+copying /home/sevket/su-alti-gorev-row/build/rov_vision/build/lib/rov_vision/video_mission.py -> /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision
+copying /home/sevket/su-alti-gorev-row/build/rov_vision/build/lib/rov_vision/mission_orbit.py -> /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision
+byte-compiling /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/video_mission.py to video_mission.cpython-310.pyc
+byte-compiling /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/mission_orbit.py to mission_orbit.cpython-310.pyc
+running install_data
+running install_egg_info
+removing '/home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision-0.0.0-py3.10.egg-info' (and everything under it)
+Copying ../../build/rov_vision/rov_vision.egg-info to /home/sevket/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision-0.0.0-py3.10.egg-info
+running install_scripts
+Installing autonomous_driver script to /home/sevket/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+Installing line_follower script to /home/sevket/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+Installing mission_orbit script to /home/sevket/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+Installing video_publisher script to /home/sevket/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+writing list of installed files to '/home/sevket/su-alti-gorev-row/build/rov_vision/install.log'
