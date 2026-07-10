@@ -185,9 +185,11 @@ class UnderwaterImageProcessor:
 # =============================================================================
 class LineDetector:
     """
-    Su altı ortamı için çok-yöntemli çizgi dedektörü.
+    Su altı ortamı için çok-yöntemli çizgi dedektörü (V2 — Yarışma).
     - Renk tabanlı maske (HSV)
     - Kontur + moment tabanlı merkez bulma
+    - En-boy oranı filtresi (şerit şekli doğrulama)
+    - Zamansal tutarlılık (son bilinen pozisyona yakınlık tercihi)
     - Hough çizgi doğrulama (yedek)
     - Dinamik HSV eşiği güncelleme (bio-kirlenme adaptasyonu)
     """
@@ -196,12 +198,22 @@ class LineDetector:
                  hsv_lower=(0, 0, 0),
                  hsv_upper=(180, 80, 80),
                  min_contour_area=500,
-                 roi_top_ratio=0.4):
+                 roi_top_ratio=0.4,
+                 min_aspect_ratio=1.5):
         # HSV alt/üst eşikleri (siyah/koyu çizgi için default)
         self.hsv_lower = np.array(hsv_lower, dtype=np.uint8)
         self.hsv_upper = np.array(hsv_upper, dtype=np.uint8)
         self.min_contour_area = min_contour_area
         self.roi_top_ratio = roi_top_ratio  # Görüntünün kaç üst %'si kesilir
+
+        # ✅ YENİ: Şerit şekli filtresi — şerit uzun olmalı, kare olmamalı
+        # En-boy oranı (aspect ratio) = uzun kenar / kısa kenar
+        # Şerit → yüksek oran (>1.5), gölge/leke → düşük oran (~1.0)
+        self.min_aspect_ratio = min_aspect_ratio
+
+        # ✅ YENİ: Son bilinen çizgi pozisyonu (zamansal tutarlılık)
+        self._last_cx = None
+        self._last_cy = None
 
         # Dinamik eşik için adaptasyon sayacı
         self._adapt_counter = 0
@@ -239,12 +251,36 @@ class LineDetector:
         # Çok küçük konturları filtrele
         valid = [c for c in contours if cv2.contourArea(c) > self.min_contour_area]
 
+        # ✅ YENİ: En-boy oranı filtresi (şerit uzun olmalı, leke/gölge değil)
+        if self.min_aspect_ratio > 0 and valid:
+            elongated = []
+            for c in valid:
+                rect = cv2.minAreaRect(c)
+                w_r, h_r = rect[1]
+                if min(w_r, h_r) > 0:
+                    ratio = max(w_r, h_r) / min(w_r, h_r)
+                    if ratio >= self.min_aspect_ratio:
+                        elongated.append(c)
+            # Eğer uzun şekilli kontur varsa onları tercih et,
+            # yoksa tüm geçerli konturları kullan (fallback)
+            if elongated:
+                valid = elongated
+
         if not valid:
             # Hough yedek dedektörü
+            self._last_cx = None
+            self._last_cy = None
             return self._hough_fallback(roi, w, roi_y_start, debug)
 
-        # En büyük ve en uzun konturu seç
-        best = max(valid, key=lambda c: cv2.contourArea(c))
+        # ✅ YENİ: Kontur seçimi — alan + son pozisyona yakınlık skoruyla
+        if len(valid) == 1:
+            best = valid[0]
+        elif self._last_cx is not None and len(valid) > 1:
+            # Birden fazla aday varsa: alan + yakınlık skoruna göre seç
+            best = max(valid, key=lambda c: self._score_contour(c, w, roi_y_start))
+        else:
+            # İlk tespit veya tek aday: en büyük alanı seç
+            best = max(valid, key=lambda c: cv2.contourArea(c))
 
         # Moment ile merkez
         M = cv2.moments(best)
@@ -254,6 +290,10 @@ class LineDetector:
         cx = int(M["m10"] / M["m00"])
         cy = int(M["m01"] / M["m00"]) + roi_y_start
 
+        # ✅ YENİ: Son bilinen pozisyonu güncelle
+        self._last_cx = cx
+        self._last_cy = cy
+
         # Çizgi açısını hesapla (fitLine)
         angle_deg = self._compute_angle(best)
 
@@ -261,7 +301,9 @@ class LineDetector:
         cv2.drawContours(debug[roi_y_start:], [best], -1, (0, 255, 0), 2)
         cv2.circle(debug, (cx, cy), 8, (0, 0, 255), -1)
         cv2.line(debug, (w // 2, h), (cx, cy), (255, 0, 0), 2)
-        cv2.putText(debug, f"cx:{cx} cy:{cy} angle:{angle_deg:.1f}",
+        # ✅ Daha detaylı debug bilgisi
+        n_candidates = len(valid)
+        cv2.putText(debug, f"cx:{cx} cy:{cy} angle:{angle_deg:.1f} aday:{n_candidates}",
                     (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
         # Dinamik eşik adaptasyonu
@@ -291,6 +333,39 @@ class LineDetector:
         cv2.circle(debug, (cx, cy), 8, (0, 165, 255), -1)
         return cx, cy, None, debug, 0.0
 
+    def _score_contour(self, contour, frame_width, roi_y_start):
+        """
+        ✅ YENİ: Kontur skorlama — birden fazla aday kontur varsa en iyisini seçer.
+        
+        Skor = alan_skoru + yakınlık_skoru
+        - Alan: Büyük konturlar tercih edilir
+        - Yakınlık: Son bilinen pozisyona yakın konturlar tercih edilir
+          (gölge/leke genelde çizgiden uzakta olur)
+        """
+        area = cv2.contourArea(contour)
+        # Alan skorunu normalize et (0-1 arası)
+        max_area = frame_width * frame_width * 0.3  # Olası max alan
+        area_score = min(area / max_area, 1.0)
+
+        # Yakınlık skoru (son bilinen pozisyona mesafe)
+        proximity_score = 0.0
+        if self._last_cx is not None:
+            M = cv2.moments(contour)
+            if M["m00"] > 0:
+                cnt_cx = int(M["m10"] / M["m00"])
+                cnt_cy = int(M["m01"] / M["m00"]) + roi_y_start
+                dist = math.sqrt(
+                    (cnt_cx - self._last_cx) ** 2 +
+                    (cnt_cy - self._last_cy) ** 2
+                )
+                # Mesafe 0 → skor 1.0, mesafe büyük → skor 0.0
+                max_dist = frame_width * 0.5
+                proximity_score = max(0.0, 1.0 - (dist / max_dist))
+
+        # Ağırlıklı toplam: alan %40, yakınlık %60
+        # (Yakınlık daha önemli — çizgi zıplamaz, leke/gölge uzakta olur)
+        return 0.4 * area_score + 0.6 * proximity_score
+
     @staticmethod
     def _compute_angle(contour):
         """Konturun yatay ile açısını hesaplar."""
@@ -304,12 +379,37 @@ class LineDetector:
         """
         Tespit edilen çizgi piksellerinin ortalama rengine göre
         HSV eşiklerini dinamik olarak günceller (bio-kirlenme adaptasyonu).
+        
+        Su altında zamanla lens kirlenir, ışık koşulları değişir.
+        Bu fonksiyon tespit edilen şerit piksellerinin HSV ortalamasını alıp
+        eşikleri hafifçe kaydırır (ani değişimi önlemek için interpolasyon).
         """
         if len(line_pixels) < 100:
             return
-        # Basit ortalama tabanlı adaptasyon (çok agresif değişimi önlemek için
-        # mevcut eşikle interpolasyon yapılır)
-        pass  # İleri seviye: Gaussian Mixture Model ile otomatik küme tespiti
+
+        # Tespit edilen piksellerin HSV ortalamasını al
+        if len(line_pixels.shape) == 2 and line_pixels.shape[1] == 3:
+            # BGR piksellerini HSV'ye çevir
+            pixels_bgr = line_pixels.reshape(-1, 1, 3)
+            pixels_hsv = cv2.cvtColor(pixels_bgr, cv2.COLOR_BGR2HSV)
+            mean_hsv = np.mean(pixels_hsv.reshape(-1, 3), axis=0)
+
+            # Mevcut eşiklerle %80-%20 interpolasyon (çok agresif değişimi önler)
+            alpha = 0.2  # Adaptasyon hızı (%20 yeni, %80 eski)
+
+            # Alt eşiği hafifçe aşağı kaydır (daha geniş yakalama)
+            new_lower = mean_hsv - np.array([15, 30, 30])
+            new_lower = np.clip(new_lower, 0, 255)
+            self.hsv_lower = np.uint8(
+                (1 - alpha) * self.hsv_lower + alpha * new_lower
+            )
+
+            # Üst eşiği hafifçe yukarı kaydır
+            new_upper = mean_hsv + np.array([15, 30, 30])
+            new_upper = np.clip(new_upper, 0, 255)
+            self.hsv_upper = np.uint8(
+                (1 - alpha) * self.hsv_upper + alpha * new_upper
+            )
 
 
 # =============================================================================

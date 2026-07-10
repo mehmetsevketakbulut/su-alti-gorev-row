@@ -32,6 +32,9 @@ setup(
             'autonomous_driver = rov_vision.autonomous_driver:main',
             'mission_orbit = rov_vision.mission_orbit:main',
             'video_mission = rov_vision.video_mission:main',
+
+            'distance_publisher = rov_vision.distance_publisher:main',
+
         ],
     },
 )
