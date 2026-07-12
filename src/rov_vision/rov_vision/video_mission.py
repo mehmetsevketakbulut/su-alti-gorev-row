@@ -3,16 +3,18 @@ Teknofest İnsansız Su Altı Sistemleri - Video Kanıtı Görevi
 Dead Reckoning (Kör Sürüş) Tabanlı State Machine
 
 ── MOTOR KONTROLÜ ──
-autonomous_driver.py ile BİREBİR AYNI Serial PWM protokolü kullanılır:
+AnaROV Yer İstasyonu (Base Station) protokolü kullanılır:
   - Serial port : COM8 (parametre ile değiştirilebilir)
   - Baud rate   : 115200
-  - Paket formatı: "x1,y1,x2,y2\n"
-  - PWM aralığı : 1060-1940 (nötr: 1500)
+  - Paket formatı: "A,m1,m2,m3,m4,m5,m6,btn,kp,kd\n"
+  - Değerler    : -100 ile +100 arası yüzdelik dilimler
   - Kanal eşlemeleri:
-      x1 → Dönüş   (angular.z)   → Sağ dönüş = düşük PWM
-      y1 → İleri    (linear.x)    → İleri = düşük PWM (joystick tersi)
-      x2 → Yanaşma  (linear.y)    → Nötr (kullanılmıyor)
-      y2 → Derinlik (linear.z)    → Nötr (kullanılmıyor)
+      m1 → Ön Sağ (Yatay)
+      m2 → Ön Sol (Yatay)
+      m3 → Arka Sağ (Yatay)
+      m4 → Arka Sol (Yatay)
+      m5 → Dikey Sol
+      m6 → Dikey Sağ
 
 ── PARKUR SIRASI ──
   DURUM 0 - WAIT              : Başlangıç alanında bekle (5s)
