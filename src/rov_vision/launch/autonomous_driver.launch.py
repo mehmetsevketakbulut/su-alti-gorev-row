@@ -24,6 +24,10 @@ def generate_launch_description():
         'camera_topic', default_value='/camera/image_raw',
         description='Kamera görüntü topic\'i'
     )
+    video_source_arg = DeclareLaunchArgument(
+        'video_source', default_value='0',
+        description='Kamera ID (0, 1) veya video dosya yolu (.mp4)'
+    )
     serial_port_arg = DeclareLaunchArgument(
         'serial_port', default_value='COM8',
         description='Arduino/STM32 serial portu (motor kontrolcü)'
@@ -55,6 +59,9 @@ def generate_launch_description():
         executable='video_publisher',
         name='video_publisher',
         output='screen',
+        parameters=[{
+            'video_source': LaunchConfiguration('video_source')
+        }]
     )
 
     # ── Distance Publisher Node (✅ YENİ) ──────────────────────────────────
@@ -144,6 +151,7 @@ def generate_launch_description():
 
     return LaunchDescription([
         camera_topic_arg,
+        video_source_arg,
         serial_port_arg,
         baud_rate_arg,
         linear_speed_arg,

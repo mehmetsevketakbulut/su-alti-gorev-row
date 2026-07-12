@@ -38,6 +38,8 @@ class VideoPublisher(Node):
 
         if not self.cap.isOpened():
             self.get_logger().error(f"❌ Video kaynağı açılamadı: {video_source}")
+            # Kamera açılamadıysa timer'ı durdur ki sürekli hata basmasın
+            self.timer.cancel()
         else:
             if self.is_file:
                 self.get_logger().info(f"🎞️ Video dosyasından yayın başladı: {video_source}")
@@ -47,6 +49,10 @@ class VideoPublisher(Node):
     def timer_callback(self):
         ret, frame = self.cap.read()
         if ret:
+            # Yüksek çözünürlüklü telefon videoları sistemi inanılmaz yavaşlatır!
+            # Yayınlamadan önce her zaman 640x480'e küçült.
+            frame = cv2.resize(frame, (640, 480))
+            
             msg = self.bridge.cv2_to_imgmsg(frame, "bgr8")
             self.publisher_.publish(msg)
         else:
