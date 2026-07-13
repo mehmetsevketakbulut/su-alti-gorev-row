@@ -110,16 +110,16 @@ void loop() {
       if (parsed == 9) {
         sonVeriZamani = millis(); 
         
-        // Gelen veriler artık PWM olduğu için map kullanmıyoruz, direkt atıyoruz
-        base_pwm_m1 = constrain(v[0], 1000, 2000);
-        base_pwm_m2 = constrain(v[1], 1000, 2000);
-        base_pwm_m3 = constrain(v[2], 1000, 2000);
-        base_pwm_m4 = constrain(v[3], 1000, 2000);
-        base_pwm_m5 = constrain(v[4], 1000, 2000);
+        // Gelen değerler tekrar -100 ile +100 arası yüzdelik değerler.
+        // Eski sistemdeki gibi map fonksiyonuyla PWM'e çeviriyoruz.
+        base_pwm_m1 = map((int8_t)v[0], -100, 100, 1000, 2000);
+        base_pwm_m2 = map((int8_t)v[1], -100, 100, 1000, 2000);
+        base_pwm_m3 = map((int8_t)v[2], -100, 100, 1000, 2000);
+        base_pwm_m4 = map((int8_t)v[3], -100, 100, 1000, 2000);
+        base_pwm_m5 = map((int8_t)v[4], -100, 100, 1000, 2000);
         
-        // Önceki kodda M6 motoru ters (2000'den 1000'e) map edilmişti.
-        // Jetson'dan PWM geldiği için PWM değerini ters çeviriyoruz (1500 merkezli tersi: 3000 - PWM)
-        base_pwm_m6 = constrain(3000 - v[5], 1000, 2000);
+        // M6 motoru eski kodda olduğu gibi ters map ediliyor
+        base_pwm_m6 = map((int8_t)v[5], -100, 100, 2000, 1000);
         
         // PID Parametrelerini güncelle (v[7] = kp, v[8] = kd)
         Kp = (double)v[7] / 100.0;
