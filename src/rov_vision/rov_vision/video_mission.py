@@ -260,8 +260,18 @@ class VideoMissionNode(Node):
         
         for val in thrusters:
             val = max(-1.0, min(1.0, val)) 
-            scaled_val = val * self.power_limit_percent
-            scaled_thrusters.append(int(scaled_val))
+            
+            # -1.0 ile 1.0 arasındaki değeri, power_limit_percent ile hız/ofset değerine çeviriyoruz (örn: 40)
+            speed_offset = val * self.power_limit_percent
+            
+            # Kullanıcının talebi: "hız 40 ise motorlara 1540 veya 1460 gitmeli"
+            # Bu nedenle 1500 nötr değerinin üzerine doğrudan ekleme yapıyoruz
+            pwm_val = 1500 + speed_offset
+            
+            # Güvenlik için pwm değerlerini 1100 ile 1900 arasında sınırla (clamp)
+            pwm_val = clamp(pwm_val, 1100, 1900)
+            
+            scaled_thrusters.append(int(pwm_val))
             
         return tuple(scaled_thrusters)
 
