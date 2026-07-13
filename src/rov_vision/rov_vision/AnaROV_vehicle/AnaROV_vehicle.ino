@@ -24,12 +24,7 @@
 // --- Sensörler ---
 #define PIN_HALL_EFFECT 0  // D8  (Manyetik Şalter)
 
-// --- Jetson UART Bağlantısı (Serial2) ---
-//  Deneyap D2 (GPIO17) = ESP32 UART2 TX → Jetson RX'e bağlı
-//  Deneyap D3 (GPIO16) = ESP32 UART2 RX → Jetson TX'e bağlı
-//  GND ortak hat
-#define JETSON_RX_PIN 16  // D3 — Jetson'dan veri ALIR
-#define JETSON_TX_PIN 17  // D2 — Jetson'a veri GÖNDER (debug/telemetri)
+// Jetson USB üzerinden bağlanacak (Serial objesi kullanılacak)
 
 // ══════════════════════════════════════════════════════════════════
 //  DONANIM NESNELERİ
@@ -71,13 +66,8 @@ int base_pwm_m4 = 1500, base_pwm_m5 = 1500, base_pwm_m6 = 1500;
 //  SETUP
 // ══════════════════════════════════════════════════════════════════
 void setup() {
-  // --- USB Serial (Debug çıktısı için — PC bağlıysa) ---
+  // --- Jetson USB Serial Bağlantısı ---
   Serial.begin(115200);
-  
-  // --- Jetson UART (Asıl haberleşme hattı) ---
-  //  D3 (GPIO16) = RX ← Jetson TX
-  //  D2 (GPIO17) = TX → Jetson RX  
-  Serial2.begin(115200, SERIAL_8N1, JETSON_RX_PIN, JETSON_TX_PIN);
   
   Wire.begin(); 
 
@@ -123,8 +113,8 @@ void setup() {
   rollPID.SetOutputLimits(-200, 200); 
 
   Serial.println("══════════════════════════════════════════");
-  Serial.println("  AnaROV Motor Kontrolcusu v2.0");
-  Serial.println("  Jetson UART: Serial2 (D2=TX, D3=RX)");
+  Serial.println("  AnaROV Motor Kontrolcusu v2.1");
+  Serial.println("  Jetson Baglantisi: USB (Serial)");
   Serial.println("  Protokol: A,m1,m2,m3,m4,m5,m6,btn,kp,kd");
   Serial.println("══════════════════════════════════════════");
 }
@@ -139,11 +129,11 @@ void loop() {
     return; 
   }
 
-  // --- 2. SERİ HABERLEŞME (Jetson TX/RX — Serial2 üzerinden) ---
+  // --- 2. SERİ HABERLEŞME (Jetson USB — Serial üzerinden) ---
   // Jetson'dan gelen paket: A,m1,m2,m3,m4,m5,m6,btn,kp,kd\n
   // Değerler: -100 ile +100 arası yüzdelik dilimler
-  if (Serial2.available() > 0) {
-    String data = Serial2.readStringUntil('\n');
+  if (Serial.available() > 0) {
+    String data = Serial.readStringUntil('\n');
     data.trim(); // Satır sonu karakterlerini temizle (\r, boşluk vs.)
     
     if (data.startsWith("A,")) {
@@ -179,44 +169,6 @@ void loop() {
         base_pwm_m6 = map(constrain(v[5], -100, 100), -100, 100, 2000, 1000);
         
         // PID Parametrelerini güncelle (v[7] = kp*100, v[8] = kd*100)
-        Kp = (double)v[7] / 100.0;
-        Kd = (double)v[8] / 100.0;
-        rollPID.SetTunings(Kp, Ki, Kd);
-      } else {
-        hataliPaketSayisi++;
-      }
-    }
-  }
-
-  // --- USB Serial'dan da okuma (PC bağlıysa, test/debug amaçlı) ---
-  if (Serial.available() > 0) {
-    String data = Serial.readStringUntil('\n');
-    data.trim();
-    
-    if (data.startsWith("A,")) {
-      int v[9];
-      int parsed = sscanf(data.c_str(), "A,%d,%d,%d,%d,%d,%d,%d,%d,%d", 
-                          &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8]);
-      
-      if (parsed == 9) {
-        sonVeriZamani = millis();
-        alinanPaketSayisi++;
-        
-        if (v[6] == 1) {
-          killSwitchAktif = true;
-          motorlariDurdur();
-          return;
-        } else {
-          killSwitchAktif = false;
-        }
-        
-        base_pwm_m1 = map(constrain(v[0], -100, 100), -100, 100, 1000, 2000);
-        base_pwm_m2 = map(constrain(v[1], -100, 100), -100, 100, 1000, 2000);
-        base_pwm_m3 = map(constrain(v[2], -100, 100), -100, 100, 1000, 2000);
-        base_pwm_m4 = map(constrain(v[3], -100, 100), -100, 100, 1000, 2000);
-        base_pwm_m5 = map(constrain(v[4], -100, 100), -100, 100, 1000, 2000);
-        base_pwm_m6 = map(constrain(v[5], -100, 100), -100, 100, 2000, 1000);
-        
         Kp = (double)v[7] / 100.0;
         Kd = (double)v[8] / 100.0;
         rollPID.SetTunings(Kp, Ki, Kd);
@@ -263,35 +215,20 @@ void loop() {
     esc_m5.writeMicroseconds(final_m5);
     esc_m6.writeMicroseconds(final_m6);
 
-    // --- DEBUG ÇIKTISI (USB Serial üzerinden, 500ms aralıkla) ---
+    // Not: Jetson artık bu hatta dinliyor olduğu için yoğun debug çıktısını kapalı tutmakta
+    // veya sadece belirli durumlarda kullanmakta fayda var.
+    /*
     if (mevcutZaman - sonYazdirmaZamani >= YAZDIRMA_ARALIGI) {
       sonYazdirmaZamani = mevcutZaman;
       Serial.print("[OK] PKT:");
-      Serial.print(alinanPaketSayisi);
-      Serial.print(" ERR:");
-      Serial.print(hataliPaketSayisi);
-      Serial.print(" | M1:");
-      Serial.print(final_m1);
-      Serial.print(" M2:");
-      Serial.print(final_m2);
-      Serial.print(" M3:");
-      Serial.print(final_m3);
-      Serial.print(" M4:");
-      Serial.print(final_m4);
-      Serial.print(" M5:");
-      Serial.print(final_m5);
-      Serial.print(" M6:");
-      Serial.print(final_m6);
-      Serial.print(" | Roll:");
-      Serial.print(roll_input, 1);
-      Serial.print(" PID:");
-      Serial.println(roll_output, 1);
+      // ... debug loglar
     }
+    */
     
   } else {
     motorlariDurdur();
     
-    // Failsafe debug (500ms aralıkla)
+    // Failsafe debug (500ms aralıkla) - Jetson tarafında görebilirsiniz
     if (mevcutZaman - sonYazdirmaZamani >= YAZDIRMA_ARALIGI) {
       sonYazdirmaZamani = mevcutZaman;
       Serial.print("[FAILSAFE] Veri yok! Son paket: ");

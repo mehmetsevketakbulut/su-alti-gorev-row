@@ -8,7 +8,7 @@ Seri port bağlantısını ve motor kontrolünü adım adım test eder.
 Kullanım:
   python3 test_serial_jetson.py                     # Temel bağlantı testi
   python3 test_serial_jetson.py --motor-test        # Motor sıra testi
-  python3 test_serial_jetson.py --port /dev/ttyTHS0 # Farklı port
+  python3 test_serial_jetson.py --port /dev/ttyUSB0 # Farklı port
   python3 test_serial_jetson.py --list-ports        # Mevcut portları listele
 """
 
@@ -86,8 +86,8 @@ def test_list_ports():
         print_fail("Hiç seri port bulunamadı!")
         
         # Jetson'a özgü port kontrolü
-        jetson_ports = ['/dev/ttyTHS0', '/dev/ttyTHS1', '/dev/ttyTHS2',
-                       '/dev/ttyAMA0', '/dev/ttyAMA1', '/dev/ttyS0']
+        jetson_ports = ['/dev/ttyUSB0', '/dev/ttyUSB1', '/dev/ttyACM0', 
+                        '/dev/ttyTHS0', '/dev/ttyTHS1']
         print_info("Jetson portları kontrol ediliyor...")
         for p in jetson_ports:
             if os.path.exists(p):
@@ -289,13 +289,13 @@ def main():
 Örnekler:
   python3 test_serial_jetson.py                      # Temel test
   python3 test_serial_jetson.py --motor-test         # Motor testi
-  python3 test_serial_jetson.py --port /dev/ttyTHS0  # Farklı port
+  python3 test_serial_jetson.py --port /dev/ttyUSB1  # Farklı port
   python3 test_serial_jetson.py --list-ports         # Port listele
   python3 test_serial_jetson.py --power 30           # %30 güçle motor testi
         """
     )
-    parser.add_argument('--port', default='/dev/ttyTHS1',
-                       help='Seri port (varsayılan: /dev/ttyTHS1)')
+    parser.add_argument('--port', default='/dev/ttyUSB0',
+                       help='Seri port (varsayılan: /dev/ttyUSB0)')
     parser.add_argument('--baud', type=int, default=115200,
                        help='Baud rate (varsayılan: 115200)')
     parser.add_argument('--list-ports', action='store_true',

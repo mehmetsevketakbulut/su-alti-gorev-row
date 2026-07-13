@@ -89,8 +89,8 @@ class VideoMissionNode(Node):
         #  ROS 2 PARAMETRELERİ
         # ==========================================================
 
-        # ── Serial port (Jetson TX/RX) ───────────
-        self.declare_parameter('serial_port', '/dev/ttyTHS1')
+        # ── Serial port (Jetson USB) ───────────
+        self.declare_parameter('serial_port', '/dev/ttyUSB0')
         self.declare_parameter('baud_rate',   115200)
 
         # ── Süre parametreleri (saniye) ───────────────────────────
