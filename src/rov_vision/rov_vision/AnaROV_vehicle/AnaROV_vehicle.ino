@@ -91,32 +91,44 @@ void loop() {
     return; 
   }
 
-  // --- 2. CAN HABERLEŞMESİ ---
-  long unsigned int rxId;
-  unsigned char len = 0;
-  unsigned char rxBuf[8];
-
-  if(CAN.checkReceive() == CAN_MSGAVAIL) {
-    CAN.readMsgBuf(&rxId, &len, rxBuf);
-
-    if(rxId == 0x10 && len == 7) {
+  // --- 2. SERİ HABERLEŞME (Jetson TX/RX Doğrudan Bağlantısı) ---
+  // Jetson'dan gelen paket: A,m1,m2,m3,m4,m5,m6,btn,kp,kd\n
+  // Değerler artık doğrudan PWM (1100-1900 arası)
+  if (Serial.available() > 0) {
+    String data = Serial.readStringUntil('\n');
+    data.trim(); // Satır sonu karakterlerini temizle
+    
+    if (data.startsWith("A,")) {
+      int commaIndex = data.indexOf(',');
+      int values[9];
+      
+      // Virgüllerle ayrılmış 9 adet değeri ayrıştır (m1,m2,m3,m4,m5,m6,btn,kp,kd)
+      for (int i = 0; i < 9; i++) {
+        int nextComma = data.indexOf(',', commaIndex + 1);
+        if (nextComma == -1) {
+          values[i] = data.substring(commaIndex + 1).toInt();
+        } else {
+          values[i] = data.substring(commaIndex + 1, nextComma).toInt();
+        }
+        commaIndex = nextComma;
+      }
+      
       sonVeriZamani = millis(); 
       
-      base_pwm_m1 = map((int8_t)rxBuf[0], -100, 100, 1000, 2000);
-      base_pwm_m2 = map((int8_t)rxBuf[1], -100, 100, 1000, 2000);
-      base_pwm_m3 = map((int8_t)rxBuf[2], -100, 100, 1000, 2000);
-      base_pwm_m4 = map((int8_t)rxBuf[3], -100, 100, 1000, 2000);
-      base_pwm_m5 = map((int8_t)rxBuf[4], -100, 100, 1000, 2000);
-      base_pwm_m6 = map((int8_t)rxBuf[5], -100, 100, 2000, 1000);
-    }
-    
-    if(rxId == 0x11 && len == 4) {
-      int rx_kp = word(rxBuf[0], rxBuf[1]);
-      int rx_kd = word(rxBuf[2], rxBuf[3]);
+      // Gelen veriler artık PWM olduğu için map kullanmıyoruz, direkt atıyoruz
+      base_pwm_m1 = constrain(values[0], 1000, 2000);
+      base_pwm_m2 = constrain(values[1], 1000, 2000);
+      base_pwm_m3 = constrain(values[2], 1000, 2000);
+      base_pwm_m4 = constrain(values[3], 1000, 2000);
+      base_pwm_m5 = constrain(values[4], 1000, 2000);
       
-      Kp = (double)rx_kp / 100.0;
-      Kd = (double)rx_kd / 100.0;
+      // Önceki kodda M6 motoru ters (2000'den 1000'e) map edilmişti.
+      // Jetson'dan PWM geldiği için PWM değerini ters çeviriyoruz (1500 merkezli tersi: 3000 - PWM)
+      base_pwm_m6 = constrain(3000 - values[5], 1000, 2000);
       
+      // PID Parametrelerini güncelle (values[7] = kp, values[8] = kd)
+      Kp = (double)values[7] / 100.0;
+      Kd = (double)values[8] / 100.0;
       rollPID.SetTunings(Kp, Ki, Kd);
     }
   }
