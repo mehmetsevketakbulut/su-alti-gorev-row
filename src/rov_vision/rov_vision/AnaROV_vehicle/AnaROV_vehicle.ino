@@ -160,7 +160,10 @@ void loop() {
     esc_m5.writeMicroseconds(final_m5);
     esc_m6.writeMicroseconds(final_m6);
 
-    // --- EKRANA YAZDIRMA (Gecikmesiz Blok) ---
+    // --- EKRANA YAZDIRMA (KAPATILDI) ---
+    // Jetson bu porttan veri okumadığı için, Arduino'nun sürekli veri basması 
+    // Jetson'un Serial RX buffer'ını doldurup Python kodunu kilitleyebilir!
+    /*
     if (mevcutZaman - sonYazdirmaZamani >= YAZDIRMA_ARALIGI) {
       sonYazdirmaZamani = mevcutZaman;
       Serial.print("M1(OnSag): "); Serial.print(final_m1);
@@ -170,6 +173,7 @@ void loop() {
       Serial.print(" | M5(DikSol): "); Serial.print(final_m5);
       Serial.print(" | M6(DikSag): "); Serial.println(final_m6);
     }
+    */
     
   } else {
     motorlariDurdur();
