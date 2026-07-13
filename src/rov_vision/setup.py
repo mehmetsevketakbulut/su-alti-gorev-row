@@ -34,7 +34,7 @@ setup(
             'video_mission = rov_vision.video_mission:main',
 
             'distance_publisher = rov_vision.distance_publisher:main',
-
+            'test_serial = rov_vision.test_serial_jetson:main',
         ],
     },
 )

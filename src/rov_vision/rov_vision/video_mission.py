@@ -3,8 +3,8 @@ Teknofest İnsansız Su Altı Sistemleri - Video Kanıtı Görevi
 Dead Reckoning (Kör Sürüş) Tabanlı State Machine
 
 ── MOTOR KONTROLÜ ──
-AnaROV Yer İstasyonu (Base Station) protokolü kullanılır:
-  - Serial port : COM8 (parametre ile değiştirilebilir)
+AnaROV protokolü — Jetson Serial2 (TX/RX) üzerinden Deneyap'a:
+  - Serial port : /dev/ttyTHS1 (Jetson Orin Nano UART)
   - Baud rate   : 115200
   - Paket formatı: "A,m1,m2,m3,m4,m5,m6,btn,kp,kd\n"
   - Değerler    : -100 ile +100 arası yüzdelik dilimler
@@ -16,17 +16,17 @@ AnaROV Yer İstasyonu (Base Station) protokolü kullanılır:
       m5 → Dikey Sol
       m6 → Dikey Sağ
 
-── PARKUR SIRASI ──
+── PARKUR SIRASI (Teknofest İleri Kategori) ──
   DURUM 0 - WAIT              : Başlangıç alanında bekle (5s)
-  DURUM 1 - DIVE              : Su altına dalış (3-4s agresif batma itkisi)
-  DURUM 2 - FORWARD_1         : Düz ileri git (derinlik koruma aktif)
+  DURUM 1 - DIVE              : Su altına dalış (agresif batma itkisi)
+  DURUM 2 - FORWARD_1         : Düz ileri git min 15s (derinlik koruma aktif)
   DURUM 3 - TURN_1            : Sağa 90° dön
-  DURUM 4 - FORWARD_2         : Düz ileri git
-  DURUM 5 - CIRCLE            : 360° daire çiz (linear.x + angular.z)
+  DURUM 4 - FORWARD_2         : Düz ileri git min 15s
+  DURUM 5 - CIRCLE            : 360° daire çiz (min 1m çap, min 1 tur)
   DURUM 5.5 - TURN_AFTER_CIRCLE : Daire sonrası 90° sağa dön
-  DURUM 6 - FORWARD_3         : Düz ileri git
+  DURUM 6 - FORWARD_3         : Düz ileri git min 15s
   DURUM 7 - TURN_2            : Sağa 90° dön
-  DURUM 8 - FORWARD_4         : Düz ileri git → başlangıca dön
+  DURUM 8 - FORWARD_4         : Düz ileri git min 15s → başlangıca dön
   DURUM 9 - SURFACE           : Yüzeye çıkış (yukarı itki)
 
 ── DERİNLİK KONTROLÜ ──
@@ -96,7 +96,7 @@ class VideoMissionNode(Node):
         # ── Süre parametreleri (saniye) ───────────────────────────
         self.declare_parameter('duration_wait',      5.0)
         self.declare_parameter('duration_dive',      3.5)   # Dalış süresi
-        self.declare_parameter('duration_forward',  15.0)
+        self.declare_parameter('duration_forward',  15.0)   # Teknofest: minimum 15 saniye!
         self.declare_parameter('duration_turn_90',   2.5)
         self.declare_parameter('duration_circle',   12.0)
         self.declare_parameter('duration_surface',   5.0)   # Yüzeye çıkış süresi
@@ -144,11 +144,11 @@ class VideoMissionNode(Node):
         self.get_logger().info('=' * 60)
         self.get_logger().info('🚀 VIDEO GÖREV KONTROLCÜSÜ HAZIR!')
         self.get_logger().info(f'   Serial port         : {self.serial_port} @ {self.baud_rate}')
-        self.get_logger().info(f'   Haberleşme Formatı  : AnaROV Base Station (A,m1,m2... formatı)')
+        self.get_logger().info(f'   Haberleşme          : Jetson Serial → Deneyap Serial2 (D2/D3)')
         self.get_logger().info(f'   ─── Süre Ayarları ───')
         self.get_logger().info(f'   Bekleme süresi      : {self.duration_wait:.1f} s')
         self.get_logger().info(f'   Dalış süresi        : {self.duration_dive:.1f} s')
-        self.get_logger().info(f'   Düz gitme süresi    : {self.duration_forward:.1f} s')
+        self.get_logger().info(f'   Düz gitme süresi    : {self.duration_forward:.1f} s (min 15s!)')
         self.get_logger().info(f'   90° dönüş süresi    : {self.duration_turn_90:.2f} s')
         self.get_logger().info(f'   Daire süresi        : {self.duration_circle:.1f} s')
         self.get_logger().info(f'   Yüzeye çıkış süresi : {self.duration_surface:.1f} s')
@@ -375,7 +375,7 @@ class VideoMissionNode(Node):
                 self._change_state(self.STATE_SURFACE)
 
         # ── DURUM 9: YÜZEYE ÇIKIŞ ────────────────────────────────
-        #    Görev tamamlandı, araç yukarı itki ile yüzeye çıkıyor
+        #    Görev tamamlandı, araç yukarı itki ile yüzeye çıkıyor.
         elif self.current_state == self.STATE_SURFACE:
             twist.linear.z = self.surface_speed  # Pozitif = yukarı çık
             if elapsed >= self.duration_surface:
