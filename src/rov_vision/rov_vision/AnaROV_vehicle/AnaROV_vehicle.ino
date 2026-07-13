@@ -99,37 +99,33 @@ void loop() {
     data.trim(); // Satır sonu karakterlerini temizle
     
     if (data.startsWith("A,")) {
-      int commaIndex = data.indexOf(',');
-      int values[9];
+      int v[9];
+      // sscanf ile veriyi çok daha güvenli ve tek satırda ayrıştırıyoruz. 
+      // Tam olarak 9 tane tamsayı (integer) gelip gelmediğini kontrol ediyoruz.
+      int parsed = sscanf(data.c_str(), "A,%d,%d,%d,%d,%d,%d,%d,%d,%d", 
+                          &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8]);
       
-      // Virgüllerle ayrılmış 9 adet değeri ayrıştır (m1,m2,m3,m4,m5,m6,btn,kp,kd)
-      for (int i = 0; i < 9; i++) {
-        int nextComma = data.indexOf(',', commaIndex + 1);
-        if (nextComma == -1) {
-          values[i] = data.substring(commaIndex + 1).toInt();
-        } else {
-          values[i] = data.substring(commaIndex + 1, nextComma).toInt();
-        }
-        commaIndex = nextComma;
+      // SADECE ve SADECE eksiksiz bir paket (9 eleman) geldiyse motorlara ata!
+      // Aksi halde veri bozuk gelmiş demektir (örn: kablo gürültüsü) ve reddedilir.
+      if (parsed == 9) {
+        sonVeriZamani = millis(); 
+        
+        // Gelen veriler artık PWM olduğu için map kullanmıyoruz, direkt atıyoruz
+        base_pwm_m1 = constrain(v[0], 1000, 2000);
+        base_pwm_m2 = constrain(v[1], 1000, 2000);
+        base_pwm_m3 = constrain(v[2], 1000, 2000);
+        base_pwm_m4 = constrain(v[3], 1000, 2000);
+        base_pwm_m5 = constrain(v[4], 1000, 2000);
+        
+        // Önceki kodda M6 motoru ters (2000'den 1000'e) map edilmişti.
+        // Jetson'dan PWM geldiği için PWM değerini ters çeviriyoruz (1500 merkezli tersi: 3000 - PWM)
+        base_pwm_m6 = constrain(3000 - v[5], 1000, 2000);
+        
+        // PID Parametrelerini güncelle (v[7] = kp, v[8] = kd)
+        Kp = (double)v[7] / 100.0;
+        Kd = (double)v[8] / 100.0;
+        rollPID.SetTunings(Kp, Ki, Kd);
       }
-      
-      sonVeriZamani = millis(); 
-      
-      // Gelen veriler artık PWM olduğu için map kullanmıyoruz, direkt atıyoruz
-      base_pwm_m1 = constrain(values[0], 1000, 2000);
-      base_pwm_m2 = constrain(values[1], 1000, 2000);
-      base_pwm_m3 = constrain(values[2], 1000, 2000);
-      base_pwm_m4 = constrain(values[3], 1000, 2000);
-      base_pwm_m5 = constrain(values[4], 1000, 2000);
-      
-      // Önceki kodda M6 motoru ters (2000'den 1000'e) map edilmişti.
-      // Jetson'dan PWM geldiği için PWM değerini ters çeviriyoruz (1500 merkezli tersi: 3000 - PWM)
-      base_pwm_m6 = constrain(3000 - values[5], 1000, 2000);
-      
-      // PID Parametrelerini güncelle (values[7] = kp, values[8] = kd)
-      Kp = (double)values[7] / 100.0;
-      Kd = (double)values[8] / 100.0;
-      rollPID.SetTunings(Kp, Ki, Kd);
     }
   }
 
