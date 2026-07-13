@@ -89,8 +89,8 @@ class VideoMissionNode(Node):
         #  ROS 2 PARAMETRELERİ
         # ==========================================================
 
-        # ── Serial port (autonomous_driver.py ile aynı) ───────────
-        self.declare_parameter('serial_port', 'COM8')
+        # ── Serial port (Jetson TX/RX) ───────────
+        self.declare_parameter('serial_port', '/dev/ttyTHS1')
         self.declare_parameter('baud_rate',   115200)
 
         # ── Süre parametreleri (saniye) ───────────────────────────
