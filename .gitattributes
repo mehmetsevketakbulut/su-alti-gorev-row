@@ -1,0 +1,8 @@
+# Varsayılan davranış: Git metin dosyalarını otomatik algılasın ve standartlaştırsın
+* text=auto
+
+# Bash betiklerini HER ZAMAN LF (Linux stili) kullanmaya zorla
+*.sh text eol=lf
+
+# Arduino dosyalarını HER ZAMAN LF kullanmaya zorla (Linux'ta garip derleme hatalarını önler)
+*.ino text eol=lf
