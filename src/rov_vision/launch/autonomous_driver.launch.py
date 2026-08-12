@@ -4,7 +4,7 @@ Kullanım: ros2 launch rov_vision autonomous_driver.launch.py
 
 Bu launch dosyası:
 1. video_publisher     → USB kameradan görüntü yayınlar
-2. distance_publisher  → Akustik mesafe sensöründen mesafe yayınlar
+2. pressure_publisher  → Basınç/derinlik sensöründen veri yayınlar
 3. autonomous_driver   → Çizgi takip + Mesafe kontrolü + Serial PWM çıkışı
 
 Yarışma Günü Hızlı Ayarlar:
@@ -29,8 +29,8 @@ def generate_launch_description():
         description='Kamera ID (0, 1) veya video dosya yolu (.mp4)'
     )
     serial_port_arg = DeclareLaunchArgument(
-        'serial_port', default_value='COM8',
-        description='Arduino/STM32 serial portu (motor kontrolcü)'
+        'serial_port', default_value='/dev/ttyUSB0',
+        description='Arduino/STM32/Deneyap serial portu (motor kontrolcü)'
     )
     baud_rate_arg = DeclareLaunchArgument(
         'baud_rate', default_value='115200',
@@ -40,17 +40,17 @@ def generate_launch_description():
         'linear_speed', default_value='0.15',
         description='İleri hız (m/s) — yarışmada 0.10-0.20 arası dene'
     )
-    distance_serial_port_arg = DeclareLaunchArgument(
-        'distance_serial_port', default_value='COM9',
-        description='Mesafe sensörü UART portu'
-    )
-    distance_baud_rate_arg = DeclareLaunchArgument(
-        'distance_baud_rate', default_value='9600',
-        description='Mesafe sensörü baud rate'
-    )
     target_distance_arg = DeclareLaunchArgument(
         'target_distance_cm', default_value='25.0',
         description='Tahtadan hedef mesafe (cm) — havuzda kalibre et'
+    )
+    power_limit_arg = DeclareLaunchArgument(
+        'power_limit', default_value='50',
+        description='Maksimum güç limiti (%)'
+    )
+    i2c_bus_arg = DeclareLaunchArgument(
+        'i2c_bus', default_value='1',
+        description='I2C bus ID'
     )
 
     # ── Video Publisher Node ───────────────────────────────────────────────
@@ -64,21 +64,14 @@ def generate_launch_description():
         }]
     )
 
-    # ── Distance Publisher Node (✅ YENİ) ──────────────────────────────────
-    distance_publisher_node = Node(
+    # ── Pressure Publisher Node (✅ YENİ) ──────────────────────────────────
+    pressure_publisher_node = Node(
         package='rov_vision',
-        executable='distance_publisher',
-        name='distance_publisher',
+        executable='pressure_publisher',
+        name='pressure_publisher',
         output='screen',
         parameters=[{
-            'serial_port':       LaunchConfiguration('distance_serial_port'),
-            'baud_rate':         9600,
-            'publish_topic':     '/distance_sensor',
-            'protocol':          'binary',      # Akustik sensör binary protokol
-            'publish_rate_hz':   10.0,
-            'min_range_cm':      8.0,
-            'max_range_cm':      300.0,
-            'median_filter_size': 5,
+            'i2c_bus': LaunchConfiguration('i2c_bus')
         }]
     )
 
@@ -93,15 +86,18 @@ def generate_launch_description():
             'serial_port':    LaunchConfiguration('serial_port'),
             'baud_rate':      115200,
 
+            # ── Güç Limiti ─────────────────────────────────────────────
+            'power_limit':    LaunchConfiguration('power_limit'),
+
             # ── Topic Ayarları ─────────────────────────────────────────
             'camera_topic':   LaunchConfiguration('camera_topic'),
             'cmd_vel_topic':  '/cmd_vel',
-            'distance_topic': '/distance_sensor',   # ✅ YENİ
+            'depth_topic':    '/depth_sensor',
 
             # ── Hız Ayarları ───────────────────────────────────────────
             'linear_speed':       LaunchConfiguration('linear_speed'),
             'max_angular_z':      0.8,
-            'max_vertical_speed': 0.3,              # ✅ YENİ
+            'max_vertical_speed': 0.3,
 
             # ── PID - Yanal Hata ───────────────────────────────────────
             'pid_kp':   0.003,
@@ -113,7 +109,11 @@ def generate_launch_description():
             'angle_kp': 0.005,
             'angle_kd': 0.001,
 
-            # ── ✅ YENİ: PID - Mesafe Kontrolü (Dikey Eksen) ──────────
+            # ── PID - Roll Düzeltme ────────────────────────────────────
+            'roll_kp': 1.5,
+            'roll_kd': 0.25,
+
+            # ── PID - Mesafe Kontrolü (Dikey Eksen) ──────────
             'distance_pid_kp':             0.008,
             'distance_pid_ki':             0.001,
             'distance_pid_kd':             0.003,
@@ -133,19 +133,39 @@ def generate_launch_description():
             # Siyah şerit (kırmızı tahta üzerinde)
             # Yarışma günü havuzda kalibre et!
             'hsv_lower': [0,   0,   0],
-            'hsv_upper': [180, 80,  60],
+            'hsv_upper': [180, 50,  50],
 
             # ── Çizgi Kayıp Toleransı ──────────────────────────────────
             'max_lost_frames':  30,
             'search_angular_z': 0.3,
 
-            # ── ✅ YENİ: Hat Sonu Algılama ─────────────────────────────
+            # ── Hat Sonu Algılama ─────────────────────────────
             'end_of_line_lost_frames':  20,     # 20 frame kayıp → hat sonu
             'min_following_before_eol': 60,     # En az 60 frame takip etmiş ol
             'eol_stabilize_seconds':    0.5,    # 0.5 sn bekle → MISSION_READY (anında!)
 
-            # ── ✅ YENİ: Acil Durum ────────────────────────────────────
+            # ── Acil Durum ────────────────────────────────────
             'emergency_pullback_frames': 10,
+        }]
+    )
+
+    # ── IMU Publisher Node (BMI085) ────────────────────────────────────────
+    imu_publisher_node = Node(
+        package='rov_vision',
+        executable='imu_publisher',
+        name='imu_publisher',
+        output='screen'
+    )
+
+    # ── Distance Publisher Node (UART) ──────────────────────────────────────
+    distance_publisher_node = Node(
+        package='rov_vision',
+        executable='distance_publisher',
+        name='distance_publisher',
+        output='screen',
+        parameters=[{
+            'serial_port': '/dev/ttyTHS1', # Jetson Nano UART pinleri
+            'baud_rate': 9600
         }]
     )
 
@@ -155,10 +175,12 @@ def generate_launch_description():
         serial_port_arg,
         baud_rate_arg,
         linear_speed_arg,
-        distance_serial_port_arg,
-        distance_baud_rate_arg,
         target_distance_arg,
+        power_limit_arg,
+        i2c_bus_arg,
         video_publisher_node,
+        pressure_publisher_node,
+        imu_publisher_node,
         distance_publisher_node,
         autonomous_driver_node,
     ])

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
 =============================================================================
-AUTONOMOUS DRIVER V2 - Yarışma Uyumlu (Hat Takibi & Kapalı Alan İncelemesi)
+AUTONOMOUS DRIVER V3 - Firmware Uyumlu (Hat Takibi & Otonom Sürüş)
 =============================================================================
 Teknofest İnsansız Su Altı Sistemleri Yarışması — Antigravity Takımı
 
-V1'den Değişiklikler:
-  1. MESAFE SENSÖRÜ      : Akustik sensör (8-300cm) ile tahtadan mesafe kontrolü
-  2. DİKEY PID           : Tahtaya çarpmayı önleyen altitude hold
-  3. HAT SONU ALGILAMA   : Çizgi bitince fırıldak yerine tam dur
-  4. MISSION_READY       : Mini ROV bırakma için operatöre sinyal
-  5. ACİL ÇARPMA KORUMASI: Kritik mesafede tüm motorları kes, geri çekil
-  6. EĞİMLİ TAHTA DESTEĞİ: PID otomatik olarak eğime adapte olur
+V2'den Değişiklikler:
+  1. SERIAL PROTOKOL     : Firmware uyumlu "A,m1,m2,m3,m4,m5,m6,btn,kp,kd\n"
+  2. THRUSTER MIX        : Vektörel motor karışımı Python tarafında yapılıyor
+  3. MESAFE SENSÖRÜ      : Deneyap'tan serial ile okunan akustik sensör verisi
+  4. BASINÇ SENSÖRÜ      : Jetson I2C (MS5837) → /depth_sensor ROS2 topic
+  5. HAT SONU ALGILAMA   : Çizgi bitince tam dur
+  6. ACİL ÇARPMA KORUMASI: Kritik mesafede tüm motorları kes, geri çekil
 
 Durum Makinesi (State Machine):
   SEARCHING → FOLLOWING → RECOVERING → END_OF_LINE → MISSION_READY
@@ -19,16 +19,11 @@ Durum Makinesi (State Machine):
                                       ↘ LOST (uzun kayıp, takip geçmişi yok)
   EMERGENCY (mesafe kritik) → herhangi durumda tetiklenebilir
 
-Serial Protokol (Manuel sürüşle BİREBİR AYNI):
-  - Port: COM8 (parametre ile ayarlanır)
-  - Baud: 115200
-  - Paket: "x1,y1,x2,y2\n"
-  - PWM aralığı: 1060-1940 (nötr: 1500)
-  - Kanal eşlemeleri:
-      x1 → Dönüş     (yaw)    → çizgi takip angular.z
-      y1 → İleri      (surge)  → çizgi takip linear.x
-      x2 → Yanaşma    (sway)   → nötr (1500)
-      y2 → Derinlik   (heave)  → mesafe sensörü PID çıkışı
+Serial Protokol (AnaROV_vehicle.ino firmware ile uyumlu):
+  - Jetson → Deneyap TX: "A,m1,m2,m3,m4,m5,m6,btn,kp,kd\n"
+  - Deneyap → Jetson RX: "D,mesafe_cm\n" (akustik sensör)
+  - Motor değerleri: -100 ile +100 arası yüzdelik
+  - btn: 0=normal, 1=acil durdurma
 
 Kullanım:
   ros2 run rov_vision autonomous_driver
@@ -44,7 +39,7 @@ import serial
 import time
 import threading
 
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, Imu
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Float32, String
 from cv_bridge import CvBridge
@@ -64,33 +59,29 @@ from rov_vision.line_follower import (
 
 
 # =============================================================================
-# YARDIMCI FONKSİYONLAR (Manuel sürüş koduyla birebir aynı)
+# YARDIMCI FONKSİYONLAR
 # =============================================================================
-def map_value(val, in_min, in_max, out_min, out_max):
-    """Manuel sürüş kodundaki map fonksiyonu — değiştirilmedi."""
-    return int((val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
-
-
 def clamp(val, lo, hi):
     """Değeri sınırlar içinde tutar."""
     return max(lo, min(hi, val))
 
 
 # =============================================================================
-# AUTONOMOUS DRIVER V2 NODE
+# AUTONOMOUS DRIVER V3 NODE
 # =============================================================================
 class AutonomousDriverNode(Node):
     """
     Yarışma uyumlu otonom sürüş node'u.
     
     Akış:
-      Kamera → Görüntü İşleme → Çizgi Tespiti → PID → Twist
-      Mesafe Sensörü → Distance PID → Twist.linear.z  
-      Twist → PWM → Serial → Arduino/STM32
+      Kamera → Görüntü İşleme → Çizgi Tespiti → PID → Yön Komutları
+      Yön Komutları → Thruster Mix → 6 Motor Yüzdesi → Serial → Deneyap
+      Deneyap → Akustik Mesafe → Serial → Bu Node → Dikey PID
+      MS5837 → I2C → pressure_publisher → /depth_sensor → Bu Node
       
-    Serial çıkış formatı (manuel sürüşle birebir aynı):
-      "{x1},{y1},{x2},{y2}\n"
-      Her değer 1060-1940 aralığında, nötr = 1500
+    Serial çıkış formatı (AnaROV_vehicle.ino firmware ile uyumlu):
+      "A,m1,m2,m3,m4,m5,m6,btn,kp,kd\n"
+      Motor değerleri: -100 ile +100 arası yüzdelik
     """
 
     # ── Durum Makinesi (V2 — 7 Durum) ──────────────────────────────────
@@ -102,11 +93,6 @@ class AutonomousDriverNode(Node):
     STATE_LOST          = "LOST"            # Çizgi tamamen kayıp
     STATE_EMERGENCY     = "EMERGENCY"       # Acil — tahtaya çok yakın!
 
-    # ── PWM Sınırları (Manuel sürüş ile birebir aynı) ──────────────────
-    PWM_MIN     = 1060
-    PWM_MAX     = 1940
-    PWM_NEUTRAL = 1500
-
     def __init__(self):
         super().__init__('autonomous_driver')
 
@@ -115,9 +101,16 @@ class AutonomousDriverNode(Node):
         p = self._get_params()
         self.p = p
 
-        # ── Serial Port (Manuel sürüş ile aynı ayarlar) ────────────────
+        # ── Serial Port (Deneyap kart ile çift yönlü iletişim) ────────
         self.ser = None
         self._open_serial(p['serial_port'], p['baud_rate'])
+
+        # ── Serial okuma thread'i (Deneyap'tan mesafe verisi) ──────────
+        self._running = True
+        self._serial_thread = threading.Thread(
+            target=self._serial_read_loop, daemon=True
+        )
+        self._serial_thread.start()
 
         # ── Alt Sistemler (line_follower.py'den) ────────────────────────
         self.img_processor = UnderwaterImageProcessor(
@@ -135,23 +128,28 @@ class AutonomousDriverNode(Node):
         # 1. Yanal hata PID (çizginin merkezden sapması)
         self.lateral_pid = PIDController(
             kp=p['pid_kp'], ki=p['pid_ki'], kd=p['pid_kd'],
-            output_min=-p['max_angular_z'], output_max=p['max_angular_z'],
+            output_min=-1.0, output_max=1.0,
             integral_limit=p['pid_integral_limit']
         )
         # 2. Açı düzeltme PID (çizginin eğimi)
         self.angle_pid = PIDController(
             kp=p['angle_kp'], ki=0.0, kd=p['angle_kd'],
-            output_min=-p['max_angular_z'] * 0.5,
-            output_max=p['max_angular_z'] * 0.5
+            output_min=-0.5, output_max=0.5
         )
-        # 3. ✅ YENİ: Mesafe PID (tahtadan mesafe kontrolü — dikey eksen)
+        # 3. Mesafe PID (tahtadan mesafe kontrolü — dikey eksen)
         self.distance_pid = PIDController(
             kp=p['distance_pid_kp'],
             ki=p['distance_pid_ki'],
             kd=p['distance_pid_kd'],
-            output_min=-p['max_vertical_speed'],
-            output_max=p['max_vertical_speed'],
+            output_min=-1.0,
+            output_max=1.0,
             integral_limit=p['distance_pid_integral_limit']
+        )
+        
+        # 4. Roll PID (IMU'dan hesaplanan yatıklık açısı için)
+        self.roll_pid = PIDController(
+            kp=p['roll_kp'], ki=0.0, kd=p['roll_kd'],
+            output_min=-0.4, output_max=0.4
         )
 
         # ── Durum Değişkenleri ──────────────────────────────────────────
@@ -161,20 +159,27 @@ class AutonomousDriverNode(Node):
         self.lost_counter = 0
         self.bridge = CvBridge()
 
-        # ✅ YENİ: Takip sayacı (hat sonu algılama için)
+        # Takip sayacı (hat sonu algılama için)
         self.following_counter = 0
 
-        # ✅ YENİ: Mesafe sensörü durumu
+        # Mesafe sensörü durumu (Deneyap serial'den okunuyor)
         self._current_distance_cm = -1.0    # -1 = henüz veri yok
         self._last_valid_distance_cm = -1.0
-        self._distance_age_frames = 0       # Kaç frame'dir yeni mesafe gelmedi
         self._distance_last_time = 0.0
+        self._serial_lock = threading.Lock()
 
-        # ✅ YENİ: Acil durum sayacı
+        # Basınç sensörü durumu (ROS2 topic'ten okunuyor)
+        self._current_depth_cm = -1.0
+        self._depth_last_time = 0.0
+
+        # IMU Roll durumu
+        self._current_roll_deg = 0.0
+
+        # Acil durum sayacı
         self._emergency_counter = 0
         self._emergency_pullback_frames = 0
 
-        # ✅ YENİ: Hat sonu stabilizasyon zamanlayıcısı
+        # Hat sonu stabilizasyon zamanlayıcısı
         self._end_of_line_start_time = None
 
         # ── QoS ─────────────────────────────────────────────────────────
@@ -191,11 +196,25 @@ class AutonomousDriverNode(Node):
             self._image_callback,
             sensor_qos
         )
-        # ✅ YENİ: Mesafe sensörü aboneliği (depth yerine distance)
+        # Basınç sensörü (MS5837 → pressure_publisher → /depth_sensor)
         self.create_subscription(
             Float32,
-            p['distance_topic'],
+            p['depth_topic'],
+            self._depth_callback,
+            sensor_qos
+        )
+        # Mesafe sensörü (Jetson UART → distance_publisher → /distance_sensor)
+        self.create_subscription(
+            Float32,
+            '/distance_sensor',
             self._distance_callback,
+            sensor_qos
+        )
+        # IMU sensörü (Jetson I2C → imu_publisher → /imu/data)
+        self.create_subscription(
+            Imu,
+            '/imu/data',
+            self._imu_callback,
             sensor_qos
         )
 
@@ -209,14 +228,14 @@ class AutonomousDriverNode(Node):
         self.create_timer(1.0, self._watchdog_callback)
 
         self.get_logger().info(
-            '🤖 Autonomous Driver V2 (Yarışma Modu) başlatıldı!\n'
+            '🤖 Autonomous Driver V3 (Firmware Uyumlu) başlatıldı!\n'
             f'  Serial port     : {p["serial_port"]} @ {p["baud_rate"]} baud\n'
-            f'  PWM aralığı     : {self.PWM_MIN}-{self.PWM_MAX} (nötr: {self.PWM_NEUTRAL})\n'
-            f'  Mesafe sensörü  : {p["distance_topic"]}\n'
+            f'  Protokol        : A,m1,m2,m3,m4,m5,m6,btn,kp,kd\n'
+            f'  Güç sınırı      : %{p["power_limit"]}\n'
+            f'  Mesafe sensörü  : Deneyap serial (D,cm)\n'
+            f'  Basınç sensörü  : {p["depth_topic"]}\n'
             f'  Hedef mesafe    : {p["target_distance_cm"]} cm\n'
             f'  Kritik mesafe   : {p["critical_distance_cm"]} cm\n'
-            f'  Hat sonu eşiği  : {p["end_of_line_lost_frames"]} frame\n'
-            f'  Min takip süresi: {p["min_following_before_eol"]} frame\n'
             f'  Kamera topic    : {p["camera_topic"]}\n'
             f'  HSV Alt         : {p["hsv_lower"]}\n'
             f'  HSV Üst         : {p["hsv_upper"]}'
@@ -227,19 +246,25 @@ class AutonomousDriverNode(Node):
     # ═════════════════════════════════════════════════════════════════════
     def _declare_all_parameters(self):
         defaults = {
-            # === Serial port (manuel sürüş ile aynı) ===
-            'serial_port':    'COM8',
+            # === Serial port ===
+            'serial_port':    '/dev/ttyUSB0',
             'baud_rate':      115200,
 
             # === Topic'ler ===
             'camera_topic':   '/camera/image_raw',
             'cmd_vel_topic':  '/cmd_vel',
-            'distance_topic': '/distance_sensor',   # ✅ YENİ (eski: depth_topic)
+            'depth_topic':    '/depth_sensor',   # MS5837 basınç sensörü
 
-            # === Hız sınırları ===
-            'linear_speed':       0.15,     # m/s (ileri/geri max hız)
-            'max_angular_z':      0.8,      # rad/s (dönüş max hız)
-            'max_vertical_speed': 0.3,      # ✅ YENİ: dikey eksen max hız
+            # === Motor kontrol ===
+            'power_limit':        50,       # Maksimum motor gücü (%)
+            'linear_speed':       0.40,     # İleri hız (0.0-1.0 arası normalize)
+            'max_angular_z':      0.8,      # Maksimum dönüş hızı (normalize)
+            'max_vertical_speed': 0.3,      # Dikey eksen max hız (normalize)
+            'search_angular_z':   0.3,      # Arama dönüş hızı (normalize)
+
+            # === Roll PID (Deneyap firmware'ine gönderilir) ===
+            'roll_kp':            1.5,
+            'roll_kd':            0.25,
 
             # === PID - yanal hata (çizgi merkezden sapması) ===
             'pid_kp':             0.003,
@@ -251,7 +276,7 @@ class AutonomousDriverNode(Node):
             'angle_kp':           0.005,
             'angle_kd':           0.001,
 
-            # === ✅ YENİ: PID - mesafe kontrolü (tahtadan mesafe) ===
+            # === PID - mesafe kontrolü (tahtadan mesafe) ===
             'distance_pid_kp':             0.008,
             'distance_pid_ki':             0.001,
             'distance_pid_kd':             0.003,
@@ -265,23 +290,22 @@ class AutonomousDriverNode(Node):
             'temporal_buffer_size': 5,
             'roi_top_ratio':       0.4,
             'min_contour_area':    500,
-            'min_aspect_ratio':    1.5,    # ✅ YENİ: Şerit en-boy oranı filtresi
+            'min_aspect_ratio':    1.5,
 
             # === HSV eşikleri (siyah çizgi, kırmızı tahta üzerinde) ===
             'hsv_lower':           [0, 0, 0],
-            'hsv_upper':           [180, 80, 60],
+            'hsv_upper':           [180, 50, 50],
 
             # === Çizgi kayıp toleransı ===
             'max_lost_frames':     30,
-            'search_angular_z':    0.3,
 
-            # === ✅ YENİ: Hat sonu algılama ===
-            'end_of_line_lost_frames':  20,     # Çizgi bu kadar frame kayıpsa hat bitti
-            'min_following_before_eol': 60,     # Hat sonu demek için min takip süresi
-            'eol_stabilize_seconds':    0.5,    # Hat sonunda kaç sn bekle → MISSION_READY (hızlı!)
+            # === Hat sonu algılama ===
+            'end_of_line_lost_frames':  20,
+            'min_following_before_eol': 60,
+            'eol_stabilize_seconds':    0.5,
 
-            # === ✅ YENİ: Acil durum ===
-            'emergency_pullback_frames': 10,    # Acil durumda kaç frame geri çekil
+            # === Acil durum ===
+            'emergency_pullback_frames': 10,
         }
         for name, val in defaults.items():
             self.declare_parameter(name, val)
@@ -289,8 +313,10 @@ class AutonomousDriverNode(Node):
     def _get_params(self):
         names = [
             'serial_port', 'baud_rate',
-            'camera_topic', 'cmd_vel_topic', 'distance_topic',
-            'linear_speed', 'max_angular_z', 'max_vertical_speed',
+            'camera_topic', 'cmd_vel_topic', 'depth_topic',
+            'power_limit', 'linear_speed', 'max_angular_z',
+            'max_vertical_speed', 'search_angular_z',
+            'roll_kp', 'roll_kd',
             'pid_kp', 'pid_ki', 'pid_kd', 'pid_integral_limit',
             'angle_kp', 'angle_kd',
             'distance_pid_kp', 'distance_pid_ki', 'distance_pid_kd',
@@ -299,7 +325,7 @@ class AutonomousDriverNode(Node):
             'invert_vertical',
             'temporal_buffer_size', 'roi_top_ratio', 'min_contour_area', 'min_aspect_ratio',
             'hsv_lower', 'hsv_upper',
-            'max_lost_frames', 'search_angular_z',
+            'max_lost_frames',
             'end_of_line_lost_frames', 'min_following_before_eol',
             'eol_stabilize_seconds',
             'emergency_pullback_frames',
@@ -307,12 +333,12 @@ class AutonomousDriverNode(Node):
         return {n: self.get_parameter(n).value for n in names}
 
     # ═════════════════════════════════════════════════════════════════════
-    #  SERIAL PORT YÖNETİMİ
+    #  SERIAL PORT YÖNETİMİ (Çift Yönlü — TX: motor, RX: mesafe)
     # ═════════════════════════════════════════════════════════════════════
     def _open_serial(self, port, baud):
-        """Serial portu açar — manuel sürüş koduyla aynı parametreler."""
+        """Serial portu açar — Deneyap kart ile çift yönlü iletişim."""
         try:
-            self.ser = serial.Serial(port, baud, timeout=1)
+            self.ser = serial.Serial(port, baud, timeout=0.01)
             self.get_logger().info(f'✅ [BAŞARILI] {port} portuna bağlanıldı.')
         except Exception as e:
             self.get_logger().error(
@@ -322,19 +348,78 @@ class AutonomousDriverNode(Node):
             )
             self.ser = None
 
-    def _send_serial_packet(self, x1, y1, x2, y2):
+    def _serial_read_loop(self):
         """
-        Manuel sürüş koduyla BİREBİR AYNI formatta serial paket gönderir.
-        
-        Paket: "{x1},{y1},{x2},{y2}\n"
-        Her değer 1060-1940 arasında clamp edilir.
+        Arka plan thread'i: Deneyap'tan gelen seri port verisini okur.
+        (Mesafe artık ROS2 topic üzerinden geldiği için sadece debug/log okur)
         """
-        x1 = clamp(x1, self.PWM_MIN, self.PWM_MAX)
-        y1 = clamp(y1, self.PWM_MIN, self.PWM_MAX)
-        x2 = clamp(x2, self.PWM_MIN, self.PWM_MAX)
-        y2 = clamp(y2, self.PWM_MIN, self.PWM_MAX)
+        while self._running:
+            try:
+                if self.ser and self.ser.is_open and self.ser.in_waiting:
+                    line = self.ser.readline().decode('utf-8', errors='ignore').strip()
+                    if line and not line.startswith("A,"):
+                        self.get_logger().debug(f'Deneyap: {line}')
+            except Exception:
+                pass
+            time.sleep(0.005)  # 200Hz polling — hızlı tepki
 
-        paket = f"{x1},{y1},{x2},{y2}\n"
+    # ═════════════════════════════════════════════════════════════════════
+    #  VEKTÖREL THRUSTER MİX (AnaROV_video_mission.ino ile aynı mantık)
+    # ═════════════════════════════════════════════════════════════════════
+    def _thruster_mix(self, fwd, strafe, yaw, dive):
+        """
+        Yön komutlarını 6 motor yüzdesine çevirir.
+        
+        AnaROV_video_mission.ino'daki thrusterMix() fonksiyonu ile
+        BİREBİR AYNI motor karışım formülleri kullanılır.
+        
+        Args:
+            fwd:    İleri/geri  (-1.0 .. +1.0)
+            strafe: Sağ/sol     (-1.0 .. +1.0)
+            yaw:    Dönüş       (-1.0 .. +1.0)
+            dive:   Dalış/çıkış (-1.0 .. +1.0)
+        
+        Returns:
+            (m1, m2, m3, m4, m5, m6) — her biri -100..+100 arası yüzde
+        """
+        POWER_LIMIT = self.p['power_limit']
+
+        # Jetson tarafında Roll PID hesaplaması (Hedef 0 derece = tam düz)
+        roll_correction = self.roll_pid.compute(0.0 - self._current_roll_deg)
+
+        # Yatay motorlar (4 adet — vektörel karışım)
+        m_fr = fwd - strafe - yaw       # M1: Ön Sağ
+        m_fl = fwd + strafe + yaw       # M2: Ön Sol
+        m_rr = fwd + strafe - yaw       # M3: Arka Sağ
+        m_rl = fwd - strafe + yaw       # M4: Arka Sol
+
+        # Dikey motorlar (2 adet — aynı değer + roll düzeltmesi)
+        m_vl = dive - roll_correction   # M5: Dikey Sol
+        m_vr = dive + roll_correction   # M6: Dikey Sağ
+
+        # Güç sınırı uygula ve yüzdeye çevir (-100..+100)
+        m1 = int(clamp(m_fr * POWER_LIMIT, -100, 100))
+        m2 = int(clamp(m_fl * POWER_LIMIT, -100, 100))
+        m3 = int(clamp(m_rr * POWER_LIMIT, -100, 100))
+        m4 = int(clamp(m_rl * POWER_LIMIT, -100, 100))
+        m5 = int(clamp(m_vl * POWER_LIMIT, -100, 100))
+        m6 = int(clamp(m_vr * POWER_LIMIT, -100, 100))
+
+        return m1, m2, m3, m4, m5, m6
+
+    # ═════════════════════════════════════════════════════════════════════
+    #  SERIAL PAKET GÖNDERİMİ (AnaROV_vehicle.ino firmware uyumlu)
+    # ═════════════════════════════════════════════════════════════════════
+    def _send_serial_packet(self, m1, m2, m3, m4, m5, m6, btn=0):
+        """
+        AnaROV_vehicle.ino firmware'ine motor komutu gönderir.
+        
+        Firmware format: "A,m1,m2,m3,m4,m5,m6,btn,kp,kd\n"
+        - m1..m6: Motor yüzdeleri (-100 ile +100 arası)
+        - btn: Kill switch (0=normal, 1=acil durdurma)
+        - kp, kd: 0, 0 (Roll kontrolü artık Jetson'da yapıldığı için Deneyap'a 0 gidiyor)
+        """
+        paket = f"A,{m1},{m2},{m3},{m4},{m5},{m6},{btn},0,0\n"
 
         if self.ser and self.ser.is_open:
             try:
@@ -342,60 +427,50 @@ class AutonomousDriverNode(Node):
             except Exception as e:
                 self.get_logger().warn(f'Serial yazma hatası: {e}')
 
+    def _send_neutral(self):
+        """Tüm motorları nötre al (0% güç)."""
+        self._send_serial_packet(0, 0, 0, 0, 0, 0, btn=0)
+
+    def _send_kill(self):
+        """Acil durdurma — firmware kill switch aktif."""
+        self._send_serial_packet(0, 0, 0, 0, 0, 0, btn=1)
+
     # ═════════════════════════════════════════════════════════════════════
-    #  TWIST → PWM DÖNÜŞÜMÜ
+    #  BASINÇ SENSÖRÜ CALLBACK (MS5837 → /depth_sensor)
     # ═════════════════════════════════════════════════════════════════════
-    def _twist_to_pwm(self, twist):
+    def _depth_callback(self, msg: Float32):
         """
-        ROS2 Twist mesajını manuel sürüş PWM değerlerine çevirir.
-        
-        Eşleme (manuel sürüşteki joystick eksenleriyle birebir):
-          twist.angular.z  → x1 (Dönüş)     : -max..+max → 1060..1940
-          twist.linear.x   → y1 (İleri)      : -max..+max → 1940..1060 (ters!)
-          twist.linear.y   → x2 (Yanaşma)    : -max..+max → 1060..1940
-          twist.linear.z   → y2 (Derinlik)   : -max..+max → 1060..1940
+        MS5837 basınç sensöründen gelen derinlik verisini alır (cm cinsinden).
+        pressure_publisher node'u tarafından yayınlanır.
         """
-        max_lin = self.p['linear_speed']
-        max_ang = self.p['max_angular_z']
-        max_vert = self.p['max_vertical_speed']
+        self._current_depth_cm = msg.data
+        self._depth_last_time = time.monotonic()
 
-        # Angular.z → x1 (dönüş)
-        ang_z_clamped = clamp(twist.angular.z, -max_ang, max_ang)
-        x1 = map_value(ang_z_clamped, -max_ang, max_ang, self.PWM_MAX, self.PWM_MIN)
-
-        # Linear.x → y1 (ileri/geri) — joystick Y ekseni ters
-        lin_x_clamped = clamp(twist.linear.x, -max_lin, max_lin)
-        y1 = map_value(lin_x_clamped, -max_lin, max_lin, self.PWM_MAX, self.PWM_MIN)
-
-        # Linear.y → x2 (yanaşma/strafe)
-        lin_y_clamped = clamp(twist.linear.y, -max_lin, max_lin)
-        x2 = map_value(lin_y_clamped, -max_lin, max_lin, self.PWM_MIN, self.PWM_MAX)
-
-        # ✅ Linear.z → y2 (derinlik) — ARTIK mesafe PID tarafından kontrol ediliyor
-        lin_z_clamped = clamp(twist.linear.z, -max_vert, max_vert)
-        y2 = map_value(lin_z_clamped, -max_vert, max_vert, self.PWM_MIN, self.PWM_MAX)
-
-        return x1, y1, x2, y2
-
-    # ═════════════════════════════════════════════════════════════════════
-    #  ✅ YENİ: MESAFE SENSÖRÜ CALLBACK
-    # ═════════════════════════════════════════════════════════════════════
     def _distance_callback(self, msg: Float32):
         """
-        Akustik mesafe sensöründen gelen veriyi alır (cm cinsinden).
-        Aracın altından tahtaya olan mesafe.
+        Jetson UART üzerinden bağlanan akustik mesafe sensörü verisini alır (cm).
         """
-        self._current_distance_cm = msg.data
-        self._last_valid_distance_cm = msg.data
-        self._distance_age_frames = 0
-        self._distance_last_time = time.monotonic()
+        with self._serial_lock:
+            self._current_distance_cm = msg.data
+            self._last_valid_distance_cm = msg.data
+            self._distance_last_time = time.monotonic()
+
+    def _imu_callback(self, msg: Imu):
+        """
+        Jetson I2C üzerinden bağlanan IMU verisinden anlık Roll (yatıklık) açısını hesaplar.
+        """
+        ay = msg.linear_acceleration.y
+        az = msg.linear_acceleration.z
+        # Y ve Z ivmesine göre Roll açısı (radyandan dereceye çevrilir)
+        roll_rad = math.atan2(ay, az)
+        self._current_roll_deg = math.degrees(roll_rad)
 
     # ═════════════════════════════════════════════════════════════════════
-    #  ✅ YENİ: DİKEY KONTROL (Mesafe PID)
+    #  DİKEY KONTROL (Mesafe PID — Tahtaya Çarpmama)
     # ═════════════════════════════════════════════════════════════════════
     def _compute_vertical_control(self):
         """
-        Mesafe sensörü verisine göre dikey itici kontrolü hesaplar.
+        Akustik mesafe sensörü verisine göre dikey itici kontrolü hesaplar.
         
         Mantık:
           - Hedef mesafeden yakınsa → YUKARI çık (tahtadan uzaklaş)
@@ -403,22 +478,24 @@ class AutonomousDriverNode(Node):
           - Sensör verisi yoksa    → Nötr kal (güvenli)
         
         Returns:
-          vertical_speed (float): twist.linear.z için değer
+          vertical_speed (float): -1.0..+1.0 arası dikey hız komutu
           is_emergency (bool): True ise acil durum, tüm motorları durdur
         """
         target = self.p['target_distance_cm']
         critical = self.p['critical_distance_cm']
 
-        # Sensör verisi yoksa veya çok eskiyse → nötr
-        if self._current_distance_cm < 0:
+        with self._serial_lock:
+            distance = self._current_distance_cm
+            last_time = self._distance_last_time
+
+        # Sensör verisi yoksa → nötr
+        if distance < 0:
             return 0.0, False
 
         # Sensör verisi çok eskiyse (2 saniyeden fazla)
-        if time.monotonic() - self._distance_last_time > 2.0:
+        if time.monotonic() - last_time > 2.0:
             self.get_logger().warn('⚠️ Mesafe sensörü verisi eski! Dikey nötr.')
             return 0.0, False
-
-        distance = self._current_distance_cm
 
         # ─── ACİL DURUM: Çok yakın! ─────────────────────────────────
         if distance < critical:
@@ -426,28 +503,22 @@ class AutonomousDriverNode(Node):
                 f'🚨 ACİL! Mesafe {distance:.1f} cm < {critical:.1f} cm! '
                 f'YUKARI ÇEKİL!'
             )
-            # Acil kaçış — max güçle yukarı
-            emergency_speed = self.p['max_vertical_speed']
+            emergency_speed = 1.0  # Maksimum güçle yukarı
             if self.p['invert_vertical']:
                 emergency_speed = -emergency_speed
             return emergency_speed, True
 
         # ─── Normal PID kontrolü ─────────────────────────────────────
-        # Hata: hedef - gerçek
-        # Pozitif hata = çok yakın → yukarı çık
-        # Negatif hata = çok uzak → aşağı in
         error = target - distance
-
         pid_output = self.distance_pid.compute(error)
 
-        # Yön tersine çevir (isteğe bağlı)
         if self.p['invert_vertical']:
             pid_output = -pid_output
 
         return pid_output, False
 
     # ═════════════════════════════════════════════════════════════════════
-    #  ✅ YENİ: HAT SONU ALGILAMA
+    #  HAT SONU ALGILAMA
     # ═════════════════════════════════════════════════════════════════════
     def _check_end_of_line(self):
         """
@@ -456,15 +527,6 @@ class AutonomousDriverNode(Node):
         Hat sonu koşulları (TÜMÜ sağlanmalı):
           1. Çizgi kayıp süresi > end_of_line_lost_frames
           2. Daha önce yeterince uzun süre takip yapılmış olmalı
-             (following_counter > min_following_before_eol)
-        
-        Bu sayede:
-          - Geçici kayıplar (gölge, baloncuk) → RECOVERING (dön, ara)
-          - Gerçek hat sonu → END_OF_LINE (dur, bekle)
-        
-        Returns:
-          True: Hat sonu tespit edildi
-          False: Henüz hat sonu değil
         """
         eol_threshold = self.p['end_of_line_lost_frames']
         min_follow = self.p['min_following_before_eol']
@@ -488,11 +550,10 @@ class AutonomousDriverNode(Node):
             self._publish_zero_velocity()
 
     # ═════════════════════════════════════════════════════════════════════
-    #  ANA GÖRÜNTÜ CALLBACK (V2 — Yarışma Uyumlu State Machine)
+    #  ANA GÖRÜNTÜ CALLBACK (V3 — Firmware Uyumlu State Machine)
     # ═════════════════════════════════════════════════════════════════════
     def _image_callback(self, msg: Image):
         self._last_image_time = time.monotonic()
-        self._distance_age_frames += 1
 
         # ── Eğer MISSION_READY veya END_OF_LINE ise hiçbir şey yapma ──
         if self.state == self.STATE_MISSION_READY:
@@ -528,7 +589,7 @@ class AutonomousDriverNode(Node):
         h, w = frame.shape[:2]
         image_center_x = w // 2
 
-        # ── Mesafe kontrolü (dikey eksen) ─────────────────────────────
+        # ── Mesafe kontrolü (dikey eksen — akustik sensör) ────────────
         vertical_speed, is_emergency = self._compute_vertical_control()
 
         # ── ACİL DURUM: Tahtaya çok yakın! ────────────────────────────
@@ -538,32 +599,30 @@ class AutonomousDriverNode(Node):
 
         if self.state == self.STATE_EMERGENCY:
             # Acil durumda: ileri gitme, sadece yukarı çekil
-            twist = Twist()
-            twist.linear.x = 0.0
-            twist.linear.z = vertical_speed  # Yukarı çekil
-            twist.angular.z = 0.0
+            m1, m2, m3, m4, m5, m6 = self._thruster_mix(
+                fwd=0.0, strafe=0.0, yaw=0.0, dive=vertical_speed
+            )
+            self._send_serial_packet(m1, m2, m3, m4, m5, m6)
 
-            x1, y1, x2, y2 = self._twist_to_pwm(twist)
-            # İleri/dönüş motorlarını nötre al, sadece dikey aktif
-            x1 = self.PWM_NEUTRAL
-            y1 = self.PWM_NEUTRAL
-            x2 = self.PWM_NEUTRAL
-            self._send_serial_packet(x1, y1, x2, y2)
+            # ROS2 cmd_vel (telemetri için)
+            twist = Twist()
+            twist.linear.z = vertical_speed
             self.cmd_pub.publish(twist)
 
             self._emergency_pullback_frames -= 1
             if self._emergency_pullback_frames <= 0:
-                # Acil durum bitti, SEARCHING'e dön
                 self.state = self.STATE_SEARCHING
                 self.get_logger().info('🔄 Acil durum bitti, çizgi aramaya dönülüyor.')
 
             # Debug frame'e acil durum yaz
+            with self._serial_lock:
+                dist = self._current_distance_cm
             cv2.putText(frame,
-                        f'!!! ACIL - MESAFE: {self._current_distance_cm:.0f}cm !!!',
+                        f'!!! ACIL - MESAFE: {dist:.0f}cm !!!',
                         (10, h // 2),
                         cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
             self._publish_debug(frame, msg.header)
-            self._publish_status(None, twist, x1, y1, x2, y2)
+            self._publish_status(None, twist, m1, m2, m3, m4, m5, m6)
             return
 
         # ── Su altı görüntü iyileştirme ──────────────────────────────
@@ -572,14 +631,20 @@ class AutonomousDriverNode(Node):
         # ── Çizgi tespiti ────────────────────────────────────────────
         cx, cy, contour, debug_frame, angle_deg = self.detector.detect(enhanced)
 
-        # ── State Machine (V2) ───────────────────────────────────────
+        # ── State Machine (V3) ───────────────────────────────────────
         twist = Twist()
+
+        # Yön komutları (normalize: -1.0 .. +1.0)
+        fwd_cmd = 0.0
+        yaw_cmd = 0.0
+        strafe_cmd = 0.0
+        dive_cmd = vertical_speed  # Mesafe PID çıkışı her zaman aktif
 
         if cx is not None:
             # ═══ ✅ ÇİZGİ BULUNDU ═══════════════════════════════════
             self.state = self.STATE_FOLLOWING
             self.lost_counter = 0
-            self.following_counter += 1  # ✅ Takip sayacını artır
+            self.following_counter += 1
             self.last_cx = cx
 
             # Yatay hata (piksel)
@@ -593,20 +658,22 @@ class AutonomousDriverNode(Node):
                 if angle_error > 90.0:
                     angle_error -= 180.0
 
-            # PID çıkışları
+            # PID çıkışları (normalize -1.0..+1.0)
             angular_lateral = self.lateral_pid.compute(error_lateral)
             angular_angle = self.angle_pid.compute(angle_error)
 
-            twist.linear.x = self.p['linear_speed']
-            twist.angular.z = -(angular_lateral + angular_angle)
+            fwd_cmd = self.p['linear_speed']
+            yaw_cmd = -(angular_lateral + angular_angle)
 
-            # ✅ Dikey kontrol (mesafe PID çıkışı)
-            twist.linear.z = vertical_speed
+            # ROS2 Twist (telemetri/kayıt için)
+            twist.linear.x = fwd_cmd
+            twist.angular.z = yaw_cmd
+            twist.linear.z = dive_cmd
 
             # Debug HUD
             cv2.putText(debug_frame,
                         f'FOLLOWING | err:{error_lateral:.0f}px | '
-                        f'ang_z:{twist.angular.z:.3f} | '
+                        f'yaw:{yaw_cmd:.3f} | '
                         f'takip:{self.following_counter}',
                         (10, debug_frame.shape[0] - 15),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
@@ -617,10 +684,12 @@ class AutonomousDriverNode(Node):
 
             # ── Hat sonu kontrolü ────────────────────────────────────
             if self._check_end_of_line():
-                # ✅ HAT SONU TESPİT EDİLDİ!
                 self.state = self.STATE_END_OF_LINE
                 self._end_of_line_start_time = time.monotonic()
-                twist = Twist()  # Tamamen dur
+                # Tamamen dur
+                fwd_cmd = 0.0
+                yaw_cmd = 0.0
+                dive_cmd = 0.0
 
                 self.get_logger().info(
                     f'🏁 HAT SONU TESPİT EDİLDİ! '
@@ -644,23 +713,27 @@ class AutonomousDriverNode(Node):
                 # ── RECOVERING: Son bilinen yöne hafif dön ───────────
                 self.state = self.STATE_RECOVERING
                 direction = np.sign(self.last_error) if self.last_error != 0 else 1.0
-                twist.linear.x = 0.0
-                twist.angular.z = direction * self.p['search_angular_z'] * 0.5
-                twist.linear.z = vertical_speed  # Dikey kontrolü koru
+                fwd_cmd = 0.0
+                yaw_cmd = direction * self.p['search_angular_z'] * 0.5
 
             elif self.lost_counter < self.p['max_lost_frames']:
                 # ── SEARCHING: Aktif arama dönüşü ────────────────────
                 self.state = self.STATE_SEARCHING
-                twist.linear.x = 0.0
-                twist.angular.z = self.p['search_angular_z']
-                twist.linear.z = vertical_speed  # Dikey kontrolü koru
+                fwd_cmd = 0.0
+                yaw_cmd = self.p['search_angular_z']
                 self.lateral_pid.reset()
                 self.angle_pid.reset()
 
             else:
                 # ── LOST: Tamamen dur ────────────────────────────────
                 self.state = self.STATE_LOST
-                twist = Twist()
+                fwd_cmd = 0.0
+                yaw_cmd = 0.0
+                dive_cmd = 0.0
+
+            twist.linear.x = fwd_cmd
+            twist.angular.z = yaw_cmd
+            twist.linear.z = dive_cmd
 
             if self.state not in (self.STATE_END_OF_LINE, self.STATE_MISSION_READY):
                 cv2.putText(debug_frame,
@@ -669,35 +742,50 @@ class AutonomousDriverNode(Node):
                             (10, debug_frame.shape[0] - 15),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
-        # ── Twist → PWM → Serial ─────────────────────────────────────
-        x1, y1, x2, y2 = self._twist_to_pwm(twist)
-        self._send_serial_packet(x1, y1, x2, y2)
+        # ── Thruster Mix → Serial ─────────────────────────────────────
+        m1, m2, m3, m4, m5, m6 = self._thruster_mix(
+            fwd=fwd_cmd, strafe=strafe_cmd, yaw=yaw_cmd, dive=dive_cmd
+        )
+        self._send_serial_packet(m1, m2, m3, m4, m5, m6)
 
-        # ── ROS2 cmd_vel yayını ──────────────────────────────────────
+        # ── ROS2 cmd_vel yayını (telemetri) ───────────────────────────
         self.cmd_pub.publish(twist)
 
         # ── Debug görüntüsü ──────────────────────────────────────────
-        # Mesafe bilgisini her zaman göster
-        dist_color = (0, 255, 0)  # Yeşil = güvenli
-        if self._current_distance_cm > 0:
-            if self._current_distance_cm < self.p['critical_distance_cm']:
-                dist_color = (0, 0, 255)  # Kırmızı = tehlikeli
-            elif self._current_distance_cm < self.p['target_distance_cm'] * 0.7:
-                dist_color = (0, 165, 255)  # Turuncu = dikkat
+        with self._serial_lock:
+            dist = self._current_distance_cm
 
+        # Motor değerleri
         cv2.putText(debug_frame,
-                    f'PWM: {x1},{y1},{x2},{y2}',
+                    f'M: {m1},{m2},{m3},{m4},{m5},{m6}',
                     (10, 25),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
 
-        dist_text = (f'Mesafe: {self._current_distance_cm:.1f}cm '
+        # Mesafe bilgisi
+        dist_color = (0, 255, 0)
+        if dist > 0:
+            if dist < self.p['critical_distance_cm']:
+                dist_color = (0, 0, 255)
+            elif dist < self.p['target_distance_cm'] * 0.7:
+                dist_color = (0, 165, 255)
+
+        dist_text = (f'Mesafe: {dist:.1f}cm '
                      f'(hedef:{self.p["target_distance_cm"]:.0f}cm)'
-                     if self._current_distance_cm > 0
-                     else 'Mesafe: YOK')
+                     if dist > 0
+                     else 'Mesafe: SENSÖR YOK')
         cv2.putText(debug_frame,
                     dist_text,
                     (10, 50),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, dist_color, 2)
+
+        # Derinlik bilgisi (basınç sensörü)
+        depth_text = (f'Derinlik: {self._current_depth_cm:.1f}cm'
+                      if self._current_depth_cm > 0
+                      else 'Derinlik: SENSÖR YOK')
+        cv2.putText(debug_frame,
+                    depth_text,
+                    (10, 75),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 200, 0), 2)
 
         # Durum çubuğu (üst kısım)
         state_colors = {
@@ -713,18 +801,11 @@ class AutonomousDriverNode(Node):
         cv2.rectangle(debug_frame, (0, 0), (w, 8), bar_color, -1)
 
         self._publish_debug(debug_frame, msg.header)
-        self._publish_status(cx, twist, x1, y1, x2, y2)
+        self._publish_status(cx, twist, m1, m2, m3, m4, m5, m6)
 
     # ═════════════════════════════════════════════════════════════════════
     #  YARDIMCI METHODLAR
     # ═════════════════════════════════════════════════════════════════════
-    def _send_neutral(self):
-        """Tüm kanalları nötre al."""
-        self._send_serial_packet(
-            self.PWM_NEUTRAL, self.PWM_NEUTRAL,
-            self.PWM_NEUTRAL, self.PWM_NEUTRAL
-        )
-
     def _publish_zero_velocity(self):
         self.cmd_pub.publish(Twist())
 
@@ -737,17 +818,20 @@ class AutonomousDriverNode(Node):
         except Exception:
             pass
 
-    def _publish_status(self, cx, twist, x1, y1, x2, y2):
+    def _publish_status(self, cx, twist, m1, m2, m3, m4, m5, m6):
         """Durum mesajını yayınlar."""
+        with self._serial_lock:
+            dist = self._current_distance_cm
         status_msg = String()
         status_msg.data = (
             f'state={self.state},'
             f'cx={cx},'
             f'error={self.last_error:.1f},'
-            f'distance_cm={self._current_distance_cm:.1f},'
+            f'distance_cm={dist:.1f},'
+            f'depth_cm={self._current_depth_cm:.1f},'
             f'following={self.following_counter},'
             f'lost={self.lost_counter},'
-            f'pwm={x1},{y1},{x2},{y2},'
+            f'motors={m1},{m2},{m3},{m4},{m5},{m6},'
             f'linear_x={twist.linear.x:.3f},'
             f'linear_z={twist.linear.z:.3f},'
             f'angular_z={twist.angular.z:.3f}'
@@ -756,6 +840,7 @@ class AutonomousDriverNode(Node):
 
     def destroy_node(self):
         """Kapanırken serial portu kapat ve motorları nötre al."""
+        self._running = False  # Serial okuma thread'ini durdur
         self._send_neutral()
         if self.ser and self.ser.is_open:
             self.ser.close()
