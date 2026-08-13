@@ -532,7 +532,7 @@ class UnderwaterLineFollowerNode(Node):
             'min_contour_area': 500,
             # HSV eşikleri (siyah çizgi - derin su zemini)
             'hsv_lower':      [0, 0, 0],
-            'hsv_upper':      [180, 80, 60],
+            'hsv_upper':      [180, 255, 45],
             # Çizgi kayıp toleransı
             'max_lost_frames': 30,        # Bu kadar kare kayıptan sonra LOST
             'search_angular_z': 0.3,     # Arama dönüş hızı

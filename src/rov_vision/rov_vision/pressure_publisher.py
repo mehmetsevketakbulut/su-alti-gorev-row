@@ -13,7 +13,7 @@ class PressurePublisher(Node):
         self.declare_parameter('i2c_bus', 1)
         self.declare_parameter('publish_topic', '/depth_sensor')
         self.declare_parameter('publish_rate_hz', 10.0)
-        self.declare_parameter('fluid_density', 'freshwater')
+        self.declare_parameter('fluid_density', 'saltwater')
 
         # Parametre değerlerini al
         self.i2c_bus = self.get_parameter('i2c_bus').value

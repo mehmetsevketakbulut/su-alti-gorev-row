@@ -294,7 +294,7 @@ class AutonomousDriverNode(Node):
 
             # === HSV eşikleri (siyah çizgi, kırmızı tahta üzerinde) ===
             'hsv_lower':           [0, 0, 0],
-            'hsv_upper':           [180, 50, 50],
+            'hsv_upper':           [180, 255, 45],
 
             # === Çizgi kayıp toleransı ===
             'max_lost_frames':     30,
