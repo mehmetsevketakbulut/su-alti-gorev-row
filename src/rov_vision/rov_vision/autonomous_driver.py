@@ -146,10 +146,15 @@ class AutonomousDriverNode(Node):
             integral_limit=p['distance_pid_integral_limit']
         )
         
-        # 4. Roll PID (IMU'dan hesaplanan yatıklık açısı için)
+        # 4. Roll PID (BNO085 donanımsal füzyon — yatıklık stabilizasyonu)
         self.roll_pid = PIDController(
             kp=p['roll_kp'], ki=0.0, kd=p['roll_kd'],
             output_min=-0.4, output_max=0.4
+        )
+        # 5. Pitch PID (BNO085 sayesinde — öne/arkaya sallanma stabilizasyonu)
+        self.pitch_pid = PIDController(
+            kp=p['pitch_pid_kp'], ki=0.0, kd=p['pitch_pid_kd'],
+            output_min=-0.3, output_max=0.3
         )
 
         # ── Durum Değişkenleri ──────────────────────────────────────────
@@ -172,10 +177,10 @@ class AutonomousDriverNode(Node):
         self._current_depth_cm = -1.0
         self._depth_last_time = 0.0
 
-        # IMU Roll durumu
+        # IMU Durum Değişkenleri (BNO085 Quaternion → Euler)
         self._current_roll_deg = 0.0
-
-        # Acil durum sayacı
+        self._current_pitch_deg = 0.0
+        self._current_yaw_deg = 0.0
         self._emergency_counter = 0
         self._emergency_pullback_frames = 0
 
@@ -262,9 +267,13 @@ class AutonomousDriverNode(Node):
             'max_vertical_speed': 0.3,      # Dikey eksen max hız (normalize)
             'search_angular_z':   0.3,      # Arama dönüş hızı (normalize)
 
-            # === Roll PID (Deneyap firmware'ine gönderilir) ===
-            'roll_kp':            1.5,
-            'roll_kd':            0.25,
+            # === Roll PID (BNO085 donanımsal füzyon — M5/M6 diferansiyel) ===
+            'roll_kp':            2.0,      # BNO085 temiz veri → daha agresif olabilir
+            'roll_kd':            0.3,
+
+            # === Pitch PID (BNO085 — öne/arkaya sallanma, M1-M4 diferansiyel) ===
+            'pitch_pid_kp':       1.0,
+            'pitch_pid_kd':       0.15,
 
             # === PID - yanal hata (çizgi merkezden sapması) ===
             'pid_kp':             0.003,
@@ -317,6 +326,7 @@ class AutonomousDriverNode(Node):
             'power_limit', 'linear_speed', 'max_angular_z',
             'max_vertical_speed', 'search_angular_z',
             'roll_kp', 'roll_kd',
+            'pitch_pid_kp', 'pitch_pid_kd',
             'pid_kp', 'pid_ki', 'pid_kd', 'pid_integral_limit',
             'angle_kp', 'angle_kd',
             'distance_pid_kp', 'distance_pid_ki', 'distance_pid_kd',
@@ -384,16 +394,21 @@ class AutonomousDriverNode(Node):
         """
         POWER_LIMIT = self.p['power_limit']
 
-        # Jetson tarafında Roll PID hesaplaması (Hedef 0 derece = tam düz)
+        # ── BNO085 Roll PID (Hedef 0° = tam yatay) ───────────────────────
         roll_correction = self.roll_pid.compute(0.0 - self._current_roll_deg)
 
-        # Yatay motorlar (4 adet — vektörel karışım)
-        m_fr = fwd - strafe - yaw       # M1: Ön Sağ
-        m_fl = fwd + strafe + yaw       # M2: Ön Sol
-        m_rr = fwd + strafe - yaw       # M3: Arka Sağ
-        m_rl = fwd - strafe + yaw       # M4: Arka Sol
+        # ── BNO085 Pitch PID (Hedef 0° = tam düz, öne/arkaya sallanma yok) ──
+        pitch_correction = self.pitch_pid.compute(0.0 - self._current_pitch_deg)
 
-        # Dikey motorlar (2 adet — aynı değer + roll düzeltmesi)
+        # Yatay motorlar (4 adet — vektörel karışım + pitch düzeltmesi)
+        # Pitch düzeltmesi: Ön motorlara eklenir, arka motorlardan çıkarılır
+        # → Araç öne eğilmişse ön motorlar daha fazla iter, arkalar azalır
+        m_fr = fwd - strafe - yaw + pitch_correction   # M1: Ön Sağ
+        m_fl = fwd + strafe + yaw + pitch_correction   # M2: Ön Sol
+        m_rr = fwd + strafe - yaw - pitch_correction   # M3: Arka Sağ
+        m_rl = fwd - strafe + yaw - pitch_correction   # M4: Arka Sol
+
+        # Dikey motorlar (2 adet — dalış komutu + roll düzeltmesi)
         m_vl = dive - roll_correction   # M5: Dikey Sol
         m_vr = dive + roll_correction   # M6: Dikey Sağ
 
@@ -457,13 +472,34 @@ class AutonomousDriverNode(Node):
 
     def _imu_callback(self, msg: Imu):
         """
-        Jetson I2C üzerinden bağlanan IMU verisinden anlık Roll (yatıklık) açısını hesaplar.
+        BNO085 IMU sensör füzyonu verisinden Roll, Pitch ve Yaw açılarını okur.
+        
+        BNO085 donanımsal quaternion çıkışı kullanılır:
+          - Low-pass filtre GEREKSIZ (BNO085 iç algoritmaları zaten filtreli)
+          - atan2(ay, az) ile elle hesaplama GEREKSIZ (donanımsal füzyon çok daha hassas)
+          - Gimbal Lock sorunu YOK (quaternion tabanlı)
         """
-        ay = msg.linear_acceleration.y
-        az = msg.linear_acceleration.z
-        # Y ve Z ivmesine göre Roll açısı (radyandan dereceye çevrilir)
-        roll_rad = math.atan2(ay, az)
-        self._current_roll_deg = math.degrees(roll_rad)
+        q = msg.orientation
+        
+        # Quaternion geçerli mi kontrol et (w=0, x=0, y=0, z=0 ise veri yok)
+        if q.w == 0.0 and q.x == 0.0 and q.y == 0.0 and q.z == 0.0:
+            return
+        
+        # ── Quaternion → Euler Dönüşümü ──────────────────────────────────
+        # Roll (X ekseni etrafında dönüş) — Aracın sağa/sola yatması
+        sinr_cosp = 2.0 * (q.w * q.x + q.y * q.z)
+        cosr_cosp = 1.0 - 2.0 * (q.x * q.x + q.y * q.y)
+        self._current_roll_deg = math.degrees(math.atan2(sinr_cosp, cosr_cosp))
+        
+        # Pitch (Y ekseni etrafında dönüş) — Aracın öne/arkaya sallanması
+        sinp = 2.0 * (q.w * q.y - q.z * q.x)
+        sinp = max(-1.0, min(1.0, sinp))  # asin için güvenli sınırlama
+        self._current_pitch_deg = math.degrees(math.asin(sinp))
+        
+        # Yaw (Z ekseni etrafında dönüş) — Aracın pusula yönü
+        siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
+        cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+        self._current_yaw_deg = math.degrees(math.atan2(siny_cosp, cosy_cosp))
 
     # ═════════════════════════════════════════════════════════════════════
     #  DİKEY KONTROL (Mesafe PID — Tahtaya Çarpmama)
@@ -703,6 +739,7 @@ class AutonomousDriverNode(Node):
                 self.lateral_pid.reset()
                 self.angle_pid.reset()
                 self.distance_pid.reset()
+                self.pitch_pid.reset()
 
                 cv2.putText(debug_frame,
                             'HAT SONU! Durduruluyor...',
@@ -723,6 +760,7 @@ class AutonomousDriverNode(Node):
                 yaw_cmd = self.p['search_angular_z']
                 self.lateral_pid.reset()
                 self.angle_pid.reset()
+                self.pitch_pid.reset()
 
             else:
                 # ── LOST: Tamamen dur ────────────────────────────────

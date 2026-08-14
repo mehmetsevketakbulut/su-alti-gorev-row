@@ -13,7 +13,8 @@
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
   <exec_depend>python3-serial</exec_depend>
-  <exec_depend>python3-smbus2</exec_depend>
+  <!-- BNO085 IMU: pip3 install adafruit-circuitpython-bno08x -->
+  <!-- MS5837 Basınç: pip3 install ms5837-python -->
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

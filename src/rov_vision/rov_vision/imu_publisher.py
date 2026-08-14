@@ -1,6 +1,24 @@
 #!/usr/bin/env python3
 """
-BMI085 IMU Publisher for ROS 2 (Jetson)
+=============================================================================
+BNO085 IMU Publisher for ROS 2 (Jetson)
+=============================================================================
+Teknofest İnsansız Su Altı Sistemleri Yarışması — Antigravity Takımı
+
+BNO085 9-Eksenli IMU (İvmeölçer + Jiroskop + Manyetometre)
+  - Dahili Hillcrest FSP sensör füzyonu ile donanımsal Quaternion çıkışı
+  - Gimbal Lock sorunu yok
+  - Titreşime karşı yüksek direnç (iç algoritmalar filtreliyor)
+
+Yayınlanan Topic:
+  /imu/data (sensor_msgs/Imu) @ 50 Hz
+    - orientation: Quaternion (x, y, z, w) — donanımsal sensör füzyonu
+    - linear_acceleration: İvmeölçer (m/s²)
+    - angular_velocity: Jiroskop (rad/s)
+
+Bağımlılıklar:
+  pip3 install adafruit-circuitpython-bno08x
+=============================================================================
 """
 import rclpy
 from rclpy.node import Node
@@ -8,64 +26,101 @@ from sensor_msgs.msg import Imu
 import math
 import time
 
+# ── BNO085 Kütüphanesi ──────────────────────────────────────────────────────
+BNO_AVAILABLE = False
 try:
-    import smbus2
-    SMBUS_AVAILABLE = True
+    import board
+    import busio
+    from adafruit_bno08x.i2c import BNO08X_I2C
+    from adafruit_bno08x import (
+        BNO_REPORT_ROTATION_VECTOR,
+        BNO_REPORT_ACCELEROMETER,
+        BNO_REPORT_GYROSCOPE,
+    )
+    BNO_AVAILABLE = True
 except ImportError:
-    SMBUS_AVAILABLE = False
+    pass
 
-# BMI085 I2C Adresleri (Varsayılan)
-BMI085_ACCEL_ADDR = 0x18
-BMI085_GYRO_ADDR = 0x68
 
-class BMI085Publisher(Node):
+class BNO085Publisher(Node):
+    """
+    BNO085 IMU sensöründen donanımsal sensör füzyonu verisi okuyarak
+    ROS 2 Imu mesajı olarak yayınlar.
+
+    BMI085'ten Farkları:
+      - Quaternion doğrudan donanımdan geliyor (elle atan2 hesabı yok)
+      - 9-eksen füzyon (ivme + gyro + manyetometre)
+      - Çok daha düşük gürültü, low-pass filtre gereksiz
+      - Roll, Pitch VE Yaw açıları kullanılabilir
+    """
+
     def __init__(self):
         super().__init__('imu_publisher')
 
+        # ── ROS 2 Parametreleri ──────────────────────────────────────────
         self.declare_parameter('i2c_bus', 1)
-        self.declare_parameter('publish_rate_hz', 20.0)
-        self.declare_parameter('accel_addr', BMI085_ACCEL_ADDR)
-        self.declare_parameter('gyro_addr', BMI085_GYRO_ADDR)
+        self.declare_parameter('publish_rate_hz', 50.0)
+        self.declare_parameter('i2c_address', 0x4A)  # BNO085 varsayılan: 0x4A (jumper ile 0x4B olabilir)
 
-        self.i2c_bus = self.get_parameter('i2c_bus').value
-        self.accel_addr = self.get_parameter('accel_addr').value
-        self.gyro_addr = self.get_parameter('gyro_addr').value
+        self.i2c_bus_id = self.get_parameter('i2c_bus').value
+        self.i2c_address = self.get_parameter('i2c_address').value
         publish_rate = self.get_parameter('publish_rate_hz').value
 
+        # ── ROS 2 Publisher ──────────────────────────────────────────────
         self.pub = self.create_publisher(Imu, '/imu/data', 10)
 
-        if not SMBUS_AVAILABLE:
-            self.get_logger().error("smbus2 kutuphanesi bulunamadi! Lutfen kurun: pip3 install smbus2")
-            self.bus = None
+        # ── BNO085 Başlatma ──────────────────────────────────────────────
+        self.bno = None
+
+        if not BNO_AVAILABLE:
+            self.get_logger().error(
+                "adafruit-circuitpython-bno08x kutuphanesi bulunamadi!\n"
+                "Lutfen kurun: pip3 install adafruit-circuitpython-bno08x"
+            )
         else:
             try:
-                self.bus = smbus2.SMBus(self.i2c_bus)
-                self.get_logger().info(f"BMI085 I2C Bus {self.i2c_bus} uzerinden baslatildi.")
-                # Uyandırma komutları (Gerekirse datasheet'e gore eklenebilir)
-                # Accel Normal Mode (0x7D -> 0x04)
-                self.bus.write_byte_data(self.accel_addr, 0x7D, 0x04)
-                time.sleep(0.05)
-            except Exception as e:
-                self.get_logger().error(f"I2C Baslatma hatasi: {e}")
-                self.bus = None
+                # I2C başlat (Jetson: board.SCL, board.SDA kullanır)
+                i2c = busio.I2C(board.SCL, board.SDA, frequency=400000)
+                self.bno = BNO08X_I2C(i2c, address=self.i2c_address)
 
+                self.get_logger().info(
+                    f"✅ BNO085 baslatildi! I2C Adres: 0x{self.i2c_address:02X}"
+                )
+
+                # Sensör raporlarını etkinleştir
+                self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+                self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+                self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
+
+                self.get_logger().info(
+                    "  📡 Aktif raporlar: ROTATION_VECTOR + ACCELEROMETER + GYROSCOPE\n"
+                    "  🎯 Donanımsal sensör füzyonu (Hillcrest FSP) aktif\n"
+                    f"  🔄 Yayın frekansı: {publish_rate} Hz"
+                )
+
+                # Sensörün stabilize olması için kısa bekleme
+                time.sleep(0.1)
+
+            except Exception as e:
+                self.get_logger().error(
+                    f"BNO085 baslatma hatasi: {e}\n"
+                    f"  I2C adresini kontrol edin: sudo i2cdetect -y {self.i2c_bus_id}\n"
+                    f"  Beklenen adres: 0x{self.i2c_address:02X}"
+                )
+                self.bno = None
+
+        # ── Timer ────────────────────────────────────────────────────────
         self.timer = self.create_timer(1.0 / publish_rate, self.timer_callback)
 
-    def read_word(self, addr, reg):
-        try:
-            # LSB, MSB okuma (Little Endian)
-            low = self.bus.read_byte_data(addr, reg)
-            high = self.bus.read_byte_data(addr, reg + 1)
-            val = (high << 8) + low
-            if val >= 0x8000:
-                return -((65535 - val) + 1)
-            else:
-                return val
-        except Exception:
-            return 0
+        # ── İstatistik sayaçları ─────────────────────────────────────────
+        self._msg_count = 0
+        self._last_log_time = time.monotonic()
 
     def timer_callback(self):
-        if self.bus is None:
+        """
+        BNO085'ten veri okuyup ROS 2 Imu mesajı olarak yayınlar.
+        """
+        if self.bno is None:
             return
 
         msg = Imu()
@@ -73,37 +128,91 @@ class BMI085Publisher(Node):
         msg.header.frame_id = 'imu_link'
 
         try:
-            # İvmeölçer Verileri (Reg: 0x12 X, 0x14 Y, 0x16 Z)
-            accel_x = self.read_word(self.accel_addr, 0x12)
-            accel_y = self.read_word(self.accel_addr, 0x14)
-            accel_z = self.read_word(self.accel_addr, 0x16)
+            # ── Quaternion (Donanımsal Sensör Füzyonu) ────────────────────
+            # BNO085 quaternion: (i, j, k, real) formatında döner
+            quat = self.bno.quaternion
+            if quat is not None and quat[0] is not None:
+                quat_i, quat_j, quat_k, quat_real = quat
+                # ROS 2 Imu mesajı: (x, y, z, w) formatında
+                msg.orientation.x = float(quat_i)
+                msg.orientation.y = float(quat_j)
+                msg.orientation.z = float(quat_k)
+                msg.orientation.w = float(quat_real)
+                # Orientation covariance: 0 = bilinmiyor, küçük değer = güvenilir
+                msg.orientation_covariance[0] = 0.01
+                msg.orientation_covariance[4] = 0.01
+                msg.orientation_covariance[8] = 0.01
+            else:
+                # Quaternion henüz hazır değil — varsayılan birim quaternion
+                msg.orientation.w = 1.0
+                msg.orientation_covariance[0] = -1.0  # Veri yok
 
-            # Cayroskop Verileri (Reg: 0x02 X, 0x04 Y, 0x06 Z)
-            gyro_x = self.read_word(self.gyro_addr, 0x02)
-            gyro_y = self.read_word(self.gyro_addr, 0x04)
-            gyro_z = self.read_word(self.gyro_addr, 0x06)
+            # ── İvmeölçer (m/s²) ─────────────────────────────────────────
+            accel = self.bno.acceleration
+            if accel is not None and accel[0] is not None:
+                msg.linear_acceleration.x = float(accel[0])
+                msg.linear_acceleration.y = float(accel[1])
+                msg.linear_acceleration.z = float(accel[2])
 
-            # LSB'den fiziksel birime donusturme (Varsayilan +/-3G ve +/-2000 dps araligi)
-            # ROS standartlarina gore (m/s^2 ve rad/s) - kalibrasyon carpani eklenebilir
-            accel_scale = (3.0 * 9.81) / 32768.0
-            gyro_scale = (2000.0 * (math.pi / 180.0)) / 32768.0
-
-            msg.linear_acceleration.x = accel_x * accel_scale
-            msg.linear_acceleration.y = accel_y * accel_scale
-            msg.linear_acceleration.z = accel_z * accel_scale
-
-            msg.angular_velocity.x = gyro_x * gyro_scale
-            msg.angular_velocity.y = gyro_y * gyro_scale
-            msg.angular_velocity.z = gyro_z * gyro_scale
+            # ── Jiroskop (rad/s) ─────────────────────────────────────────
+            gyro = self.bno.gyro
+            if gyro is not None and gyro[0] is not None:
+                msg.angular_velocity.x = float(gyro[0])
+                msg.angular_velocity.y = float(gyro[1])
+                msg.angular_velocity.z = float(gyro[2])
 
             self.pub.publish(msg)
+            self._msg_count += 1
+
+            # Her 10 saniyede bir durum logu
+            now = time.monotonic()
+            if now - self._last_log_time >= 10.0:
+                hz = self._msg_count / (now - self._last_log_time)
+                # Quaternion'dan euler hesapla (sadece log için)
+                r, p, y = self._quat_to_euler(
+                    msg.orientation.x, msg.orientation.y,
+                    msg.orientation.z, msg.orientation.w
+                )
+                self.get_logger().info(
+                    f"BNO085 | {hz:.1f} Hz | "
+                    f"Roll: {r:.1f}° Pitch: {p:.1f}° Yaw: {y:.1f}°"
+                )
+                self._msg_count = 0
+                self._last_log_time = now
 
         except Exception as e:
-            self.get_logger().warn(f"Sensorden veri okunamadi: {e}", throttle_duration_sec=2.0)
+            self.get_logger().warn(
+                f"BNO085 veri okuma hatasi: {e}",
+                throttle_duration_sec=2.0
+            )
+
+    @staticmethod
+    def _quat_to_euler(x, y, z, w):
+        """
+        Quaternion (x, y, z, w) → Euler (Roll, Pitch, Yaw) derece cinsinden.
+        Sadece log/debug amaçlı kullanılır.
+        """
+        # Roll (X ekseni etrafında dönüş)
+        sinr_cosp = 2.0 * (w * x + y * z)
+        cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
+        roll = math.degrees(math.atan2(sinr_cosp, cosr_cosp))
+
+        # Pitch (Y ekseni etrafında dönüş)
+        sinp = 2.0 * (w * y - z * x)
+        sinp = max(-1.0, min(1.0, sinp))
+        pitch = math.degrees(math.asin(sinp))
+
+        # Yaw (Z ekseni etrafında dönüş)
+        siny_cosp = 2.0 * (w * z + x * y)
+        cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+        yaw = math.degrees(math.atan2(siny_cosp, cosy_cosp))
+
+        return roll, pitch, yaw
+
 
 def main(args=None):
     rclpy.init(args=args)
-    node = BMI085Publisher()
+    node = BNO085Publisher()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
@@ -111,6 +220,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

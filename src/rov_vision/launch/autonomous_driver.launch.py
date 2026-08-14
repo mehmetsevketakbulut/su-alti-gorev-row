@@ -109,9 +109,13 @@ def generate_launch_description():
             'angle_kp': 0.005,
             'angle_kd': 0.001,
 
-            # ── PID - Roll Düzeltme ────────────────────────────────────
-            'roll_kp': 1.5,
-            'roll_kd': 0.25,
+            # ── PID - Roll Düzeltme (BNO085 donanımsal füzyon) ───────────
+            'roll_kp': 2.0,
+            'roll_kd': 0.3,
+
+            # ── PID - Pitch Düzeltme (BNO085 — öne/arkaya sallanma) ───────
+            'pitch_pid_kp': 1.0,
+            'pitch_pid_kd': 0.15,
 
             # ── PID - Mesafe Kontrolü (Dikey Eksen) ──────────
             'distance_pid_kp':             0.008,
@@ -149,12 +153,17 @@ def generate_launch_description():
         }]
     )
 
-    # ── IMU Publisher Node (BMI085) ────────────────────────────────────────
+    # ── IMU Publisher Node (BNO085 — 9 Eksen Donanımsal Füzyon) ──────────
     imu_publisher_node = Node(
         package='rov_vision',
         executable='imu_publisher',
         name='imu_publisher',
-        output='screen'
+        output='screen',
+        parameters=[{
+            'i2c_bus': LaunchConfiguration('i2c_bus'),
+            'i2c_address': 0x4A,      # BNO085 varsayılan (jumper ile 0x4B olabilir)
+            'publish_rate_hz': 50.0,  # BNO085 50 Hz destekler
+        }]
     )
 
     # ── Distance Publisher Node (UART) ──────────────────────────────────────

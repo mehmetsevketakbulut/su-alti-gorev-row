@@ -98,6 +98,13 @@ def main():
     clock = pygame.time.Clock()
     running = True
 
+    # --- SENSÖR DEĞİŞKENLERİ (YENİ EKLENDİ) ---
+    derinlik = 0.0
+    mesafe = 0
+    yaw = 0.0
+    pitch = 0.0
+    roll = 0.0
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
@@ -162,6 +169,21 @@ def main():
             paket = f"A,{motor_degerleri[0]},{motor_degerleri[1]},{motor_degerleri[2]},{motor_degerleri[3]},{motor_degerleri[4]},{motor_degerleri[5]},{btn_kapat},{int(kp*100)},{int(kd*100)}\n"
             ser.write(paket.encode('utf-8'))
 
+            # --- SENSÖR VERİLERİNİ OKUMA (YENİ EKLENDİ) ---
+            if ser.in_waiting > 0:
+                try:
+                    gelen_veri = ser.readline().decode('utf-8').strip()
+                    # Jetson'dan gelen veri "S," ile başlıyorsa bu bizim sensör paketimizdir
+                    if gelen_veri.startswith("S,"):
+                        parcalar = gelen_veri.split(',')
+                        derinlik = float(parcalar[1])
+                        mesafe = int(parcalar[2])
+                        yaw = float(parcalar[3])
+                        pitch = float(parcalar[4])
+                        roll = float(parcalar[5])
+                except:
+                    pass # Veri anlık bozuk gelirse program çökmesin
+
         # ==========================================================
         # --- SANAL TUVALE ÇİZİM ---
         # ==========================================================
@@ -200,26 +222,25 @@ def main():
         virtual_surface.blit(title, (panel_x + (panel_w - title.get_width()) // 2, panel_y + 30))
         pygame.draw.line(virtual_surface, C_CYAN, (panel_x + 30, panel_y + 80), (panel_x + panel_w - 30, panel_y + 80), 2)
 
-       # --- MODÜL 1: KAMERA VE KAYIT ---
-        y_off = panel_y + 100
+        # --- MODÜL 1: KAMERA VE KAYIT ---
+        y_off = panel_y + 80 
         virtual_surface.blit(font_header.render("GÖRÜNTÜ SİSTEMİ", True, C_TEXT), (panel_x + 30, y_off))
         
         virtual_surface.blit(font_text.render(f"Kamera İndeksi : {camera_index}", True, C_GREEN), (panel_x + 30, y_off + 40))
         virtual_surface.blit(font_small.render("Değiştirmek için [BUTON 4] kullanın", True, C_GRAY), (panel_x + 30, y_off + 65))
         
-        # Eklenen Kayıt ve Fotoğraf Butonu Yazıları
         virtual_surface.blit(font_text.render("Fotoğraf Çek   : [O Yuvarlak]", True, C_TEXT), (panel_x + 30, y_off + 110))
-        virtual_surface.blit(font_text.render("Video Kayıt    : [X Çarpı]", True, C_TEXT), (panel_x + 30, y_off + 150))
+        virtual_surface.blit(font_text.render("Video Kayıt    : [X Çarpı]", True, C_TEXT), (panel_x + 30, y_off + 140))
         
         if is_recording:
             pulse = abs(time.time() % 1 - 0.5) * 2 
-            pygame.draw.circle(virtual_surface, (int(155 + (100 * pulse)), 0, 0), (panel_x + panel_w - 50, y_off + 160), 10)
-            virtual_surface.blit(font_text.render("KAYITTA", True, C_RED), (panel_x + panel_w - 150, y_off + 150))
+            pygame.draw.circle(virtual_surface, (int(155 + (100 * pulse)), 0, 0), (panel_x + panel_w - 50, y_off + 150), 10)
+            virtual_surface.blit(font_text.render("KAYITTA", True, C_RED), (panel_x + panel_w - 150, y_off + 140))
             
-        pygame.draw.line(virtual_surface, (50, 60, 80), (panel_x + 30, y_off + 200), (panel_x + panel_w - 30, y_off + 200), 1)
+        pygame.draw.line(virtual_surface, (50, 60, 80), (panel_x + 30, y_off + 180), (panel_x + panel_w - 30, y_off + 180), 1)
 
         # --- MODÜL 2: PID AYARLARI ---
-        y_off += 230 # Modül 1 büyüdüğü için Modül 2'yi biraz daha aşağı kaydırdık
+        y_off += 180 
         virtual_surface.blit(font_header.render("YALPAMA (ROLL) PID", True, C_TEXT), (panel_x + 30, y_off))
         virtual_surface.blit(font_text.render(f"Kp Değeri : {kp:.1f}", True, C_GREEN), (panel_x + 30, y_off + 40))
         virtual_surface.blit(font_small.render("+ [Yön Yukarı]  /  - [Yön Aşağı]", True, C_GRAY), (panel_x + 30, y_off + 65))
@@ -227,16 +248,14 @@ def main():
         virtual_surface.blit(font_small.render("+ [R1 Tuşu]     /  - [L1 Tuşu]", True, C_GRAY), (panel_x + 30, y_off + 125))
         pygame.draw.line(virtual_surface, (50, 60, 80), (panel_x + 30, y_off + 160), (panel_x + panel_w - 30, y_off + 160), 1)
 
-        # --- MODÜL 3: ANALOG VE İTKİ DEĞERLERİ (YENİ EKLENEN KISIM) ---
-        y_off += 180
+        # --- MODÜL 3: ANALOG VE İTKİ DEĞERLERİ ---
+        y_off += 160
         virtual_surface.blit(font_header.render("KONTROL VE İTKİ DEĞERLERİ", True, C_TEXT), (panel_x + 30, y_off))
         
-        # Analog Ham Değerler
         virtual_surface.blit(font_small.render(f"Sol Analog (X1, Y1) : {x1:.2f} , {y1:.2f}", True, C_YELLOW), (panel_x + 30, y_off + 40))
         virtual_surface.blit(font_small.render(f"Sağ Analog (X2, Y2) : {x2:.2f} , {y2:.2f}", True, C_YELLOW), (panel_x + 30, y_off + 70))
         
-        # 6 Motorun Yüzdelik Çıkışları
-        m_y_baslangic = y_off + 120
+        m_y_baslangic = y_off + 100
         virtual_surface.blit(font_text.render(f"M1(Ön Sağ) : %{motor_degerleri[0]:3d}", True, C_CYAN), (panel_x + 30, m_y_baslangic))
         virtual_surface.blit(font_text.render(f"M2(Ön Sol) : %{motor_degerleri[1]:3d}", True, C_CYAN), (panel_x + 250, m_y_baslangic))
         
@@ -248,8 +267,21 @@ def main():
 
         pygame.draw.line(virtual_surface, (50, 60, 80), (panel_x + 30, m_y_baslangic + 130), (panel_x + panel_w - 30, m_y_baslangic + 130), 1)
 
-        # --- MODÜL 4: SİSTEM DURUMU ---
-        y_off = m_y_baslangic + 150
+        # --- MODÜL 4: SENSÖR TELEMETRİSİ (YENİ EKLENEN KISIM) ---
+        y_off = m_y_baslangic + 130
+        virtual_surface.blit(font_header.render("CANLI SENSÖR VERİLERİ", True, C_TEXT), (panel_x + 30, y_off))
+        
+        virtual_surface.blit(font_text.render(f"Derinlik: {derinlik:.2f} m", True, C_CYAN), (panel_x + 30, y_off + 40))
+        virtual_surface.blit(font_text.render(f"Mesafe: {mesafe} cm", True, C_YELLOW), (panel_x + 270, y_off + 40))
+        
+        virtual_surface.blit(font_text.render(f"Yaw: {yaw:.0f}°", True, C_GREEN), (panel_x + 30, y_off + 80))
+        virtual_surface.blit(font_text.render(f"Pitch: {pitch:.0f}°", True, C_GREEN), (panel_x + 180, y_off + 80))
+        virtual_surface.blit(font_text.render(f"Roll: {roll:.0f}°", True, C_GREEN), (panel_x + 340, y_off + 80))
+        
+        pygame.draw.line(virtual_surface, (50, 60, 80), (panel_x + 30, y_off + 120), (panel_x + panel_w - 30, y_off + 120), 1)
+
+        # --- MODÜL 5: SİSTEM DURUMU ---
+        y_off += 130
         virtual_surface.blit(font_header.render("SİSTEM DURUMU", True, C_TEXT), (panel_x + 30, y_off))
         
         durum_renk = C_RED if btn_kapat else C_GREEN

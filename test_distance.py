@@ -3,7 +3,7 @@ import serial
 import time
 import sys
 
-PORT = '/dev/ttyTHS1'
+PORT = 'COM14'
 BAUD_RATE = 9600
 
 def main():
