@@ -8,7 +8,7 @@ import sys
 try:
     from adafruit_extended_bus import ExtendedI2C as I2C
     from adafruit_bno08x.i2c import BNO08X_I2C
-    from adafruit_bno08x import BNO_REPORT_GAME_ROTATION_VECTOR
+    from adafruit_bno08x import BNO_REPORT_GAME_ROTATION_VECTOR, BNO_REPORT_ACCELEROMETER
     IMU_OK = True
 except ImportError:
     print("BNO085 kütüphanesi yok. Kurmak için: pip3 install adafruit-circuitpython-bno08x adafruit-extended-bus")
@@ -54,6 +54,7 @@ def main():
             i2c_imu = I2C(7)
             bno = BNO08X_I2C(i2c_imu, address=0x4A)
             bno.enable_feature(BNO_REPORT_GAME_ROTATION_VECTOR)
+            bno.enable_feature(BNO_REPORT_ACCELEROMETER)
             print("✅ IMU (BNO085) I2C-7 üzerinden bağlandı")
             time.sleep(0.1) # Sensörün uyanması için bekle
         except Exception as e:
@@ -90,11 +91,16 @@ def main():
 
             # IMU Oku
             roll, pitch, yaw = 0.0, 0.0, 0.0
+            accel_x, accel_y, accel_z = 0.0, 0.0, 0.0
             if bno is not None:
                 try:
                     quat = bno.game_quaternion
                     if quat and quat[0] is not None:
                         roll, pitch, yaw = euler_from_quaternion(quat[0], quat[1], quat[2], quat[3])
+                    
+                    acc = bno.acceleration
+                    if acc and acc[0] is not None:
+                        accel_x, accel_y, accel_z = acc
                 except Exception as e:
                     print(f"[IMU HATASI]: {e}")
 
@@ -107,7 +113,7 @@ def main():
                 except Exception as e:
                     print(f"[BASINÇ HATASI]: {e}")
 
-            print(f"IMU(Roll:{roll:5.1f} Pitch:{pitch:5.1f}) | Derinlik: {depth:5.1f}cm | Deneyap Gelen: {deneyap_data}")
+            print(f"IMU(R:{roll:5.1f} P:{pitch:5.1f} | AX:{accel_x:5.1f} AY:{accel_y:5.1f} AZ:{accel_z:5.1f}) | Der: {depth:5.1f}cm | Deneyap: {deneyap_data}")
             time.sleep(0.1)
 
     except KeyboardInterrupt:
