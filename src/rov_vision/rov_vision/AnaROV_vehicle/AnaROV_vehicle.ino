@@ -215,15 +215,13 @@ void loop() {
     esc_m5.writeMicroseconds(final_m5);
     esc_m6.writeMicroseconds(final_m6);
 
-    // Not: Jetson artık bu hatta dinliyor olduğu için yoğun debug çıktısını kapalı tutmakta
-    // veya sadece belirli durumlarda kullanmakta fayda var.
-    /*
     if (mevcutZaman - sonYazdirmaZamani >= YAZDIRMA_ARALIGI) {
       sonYazdirmaZamani = mevcutZaman;
-      Serial.print("[OK] PKT:");
-      // ... debug loglar
+      Serial.print("[OK] PKT: ");
+      Serial.print(alinanPaketSayisi);
+      Serial.print(" | M1:"); Serial.print(final_m1);
+      Serial.print(" M5(Dikey):"); Serial.println(final_m5);
     }
-    */
     
   } else {
     motorlariDurdur();
