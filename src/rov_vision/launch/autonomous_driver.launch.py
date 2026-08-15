@@ -48,9 +48,13 @@ def generate_launch_description():
         'power_limit', default_value='50',
         description='Maksimum güç limiti (%)'
     )
-    i2c_bus_arg = DeclareLaunchArgument(
-        'i2c_bus', default_value='1',
-        description='I2C bus ID'
+    imu_i2c_bus_arg = DeclareLaunchArgument(
+        'imu_i2c_bus', default_value='7',
+        description='IMU I2C Bus ID (varsayılan: 7 - Pin 3/5)'
+    )
+    pressure_i2c_bus_arg = DeclareLaunchArgument(
+        'pressure_i2c_bus', default_value='1',
+        description='Pressure I2C Bus ID (varsayılan: 1)'
     )
 
     # ── Video Publisher Node ───────────────────────────────────────────────
@@ -71,7 +75,7 @@ def generate_launch_description():
         name='pressure_publisher',
         output='screen',
         parameters=[{
-            'i2c_bus': LaunchConfiguration('i2c_bus')
+            'i2c_bus': LaunchConfiguration('pressure_i2c_bus')
         }]
     )
 
@@ -160,7 +164,7 @@ def generate_launch_description():
         name='imu_publisher',
         output='screen',
         parameters=[{
-            'i2c_bus': LaunchConfiguration('i2c_bus'),
+            'i2c_bus': LaunchConfiguration('imu_i2c_bus'),
             'i2c_address': 0x4A,      # BNO085 varsayılan (jumper ile 0x4B olabilir)
             'publish_rate_hz': 50.0,  # BNO085 50 Hz destekler
         }]
@@ -186,7 +190,8 @@ def generate_launch_description():
         linear_speed_arg,
         target_distance_arg,
         power_limit_arg,
-        i2c_bus_arg,
+        imu_i2c_bus_arg,
+        pressure_i2c_bus_arg,
         video_publisher_node,
         pressure_publisher_node,
         imu_publisher_node,

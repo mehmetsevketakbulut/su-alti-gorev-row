@@ -79,8 +79,14 @@ class BNO085Publisher(Node):
             )
         else:
             try:
-                # I2C başlat (Jetson: board.SCL, board.SDA kullanır)
-                i2c = busio.I2C(board.SCL, board.SDA, frequency=400000)
+                # I2C başlat (İstenen i2c_bus_id ile)
+                try:
+                    from adafruit_extended_bus import ExtendedI2C as I2C
+                    i2c = I2C(self.i2c_bus_id)
+                except ImportError:
+                    self.get_logger().warn("adafruit-extended-bus bulunamadi, varsayilan I2C kullaniliyor (pip3 install adafruit-extended-bus)")
+                    i2c = busio.I2C(board.SCL, board.SDA, frequency=400000)
+
                 self.bno = BNO08X_I2C(i2c, address=self.i2c_address)
 
                 self.get_logger().info(
