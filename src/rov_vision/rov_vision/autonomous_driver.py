@@ -349,6 +349,8 @@ class AutonomousDriverNode(Node):
         """Serial portu açar — Deneyap kart ile çift yönlü iletişim."""
         try:
             self.ser = serial.Serial(port, baud, timeout=0.01)
+            self.ser.setDTR(False)
+            self.ser.setRTS(False)
             self.get_logger().info(f'✅ [BAŞARILI] {port} portuna bağlanıldı.')
         except Exception as e:
             self.get_logger().error(
