@@ -64,7 +64,7 @@ def main():
     pressure_sensor = None
     if PRESSURE_OK:
         try:
-            temp_sensor = ms5837.MS5837_30BA(1) # i2c-1 portunda
+            temp_sensor = ms5837.MS5837_02BA(1) # i2c-1 portunda
             init_success = False
             for _ in range(5):
                 if temp_sensor.init():

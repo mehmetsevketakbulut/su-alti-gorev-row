@@ -25,7 +25,7 @@ class PressurePublisher(Node):
         self.publisher_ = self.create_publisher(Float32, self.publish_topic, 10)
 
         # MS5837 sensörünü başlat (Jetson'da timeout olabildiği için retry döngüsü)
-        self.sensor = ms5837.MS5837_30BA(self.i2c_bus)
+        self.sensor = ms5837.MS5837_02BA(self.i2c_bus)
         
         self.sensor_initialized = False
         for attempt in range(5):
