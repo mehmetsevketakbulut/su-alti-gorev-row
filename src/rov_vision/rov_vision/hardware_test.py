@@ -41,6 +41,8 @@ def main():
     ser = None
     try:
         ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=0.05)
+        ser.setDTR(False)
+        ser.setRTS(False)
         print("✅ Deneyap bağlandı (/dev/ttyUSB0)")
     except Exception as e:
         print(f"❌ Deneyap bağlantı hatası: {e}")
