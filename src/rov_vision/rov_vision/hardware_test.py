@@ -95,8 +95,8 @@ def main():
                     quat = bno.quaternion
                     if quat and quat[0] is not None:
                         roll, pitch, yaw = euler_from_quaternion(quat[0], quat[1], quat[2], quat[3])
-                except Exception:
-                    pass # I2C hatası olursa atla
+                except Exception as e:
+                    print(f"[IMU HATASI]: {e}")
 
             # Basınç Oku
             depth = 0.0
@@ -104,8 +104,8 @@ def main():
                 try:
                     if pressure_sensor.read():
                         depth = pressure_sensor.depth() * 100.0 # cm'ye çevir
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[BASINÇ HATASI]: {e}")
 
             print(f"IMU(Roll:{roll:5.1f} Pitch:{pitch:5.1f}) | Derinlik: {depth:5.1f}cm | Deneyap Gelen: {deneyap_data}")
             time.sleep(0.1)
