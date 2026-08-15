@@ -24,16 +24,23 @@ class PressurePublisher(Node):
         # Publisher'ı oluştur
         self.publisher_ = self.create_publisher(Float32, self.publish_topic, 10)
 
-        # MS5837 sensörünü başlat
+        # MS5837 sensörünü başlat (Jetson'da timeout olabildiği için retry döngüsü)
         self.sensor = ms5837.MS5837_30BA(self.i2c_bus)
+        
+        self.sensor_initialized = False
+        for attempt in range(5):
+            try:
+                if self.sensor.init():
+                    self.sensor_initialized = True
+                    break
+            except Exception as e:
+                self.get_logger().warn(f"MS5837 başlatma denemesi {attempt+1}/5 başarısız: {e}")
+            time.sleep(0.5)
 
-        if not self.sensor.init():
-            self.get_logger().error("MS5837 sensörü başlatılamadı! Lütfen I2C bağlantısını ve adresini kontrol edin.")
-            self.sensor_initialized = False
+        if not self.sensor_initialized:
+            self.get_logger().error("MS5837 sensörü başlatılamadı! Lütfen I2C bağlantısını kontrol edin.")
         else:
             self.get_logger().info("MS5837 sensörü başarıyla başlatıldı.")
-            self.sensor_initialized = True
-            
             # Akışkan yoğunluğunu ayarla
             if self.fluid_density_str.lower() == 'saltwater':
                 self.sensor.setFluidDensity(ms5837.DENSITY_SALTWATER)

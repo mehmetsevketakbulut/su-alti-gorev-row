@@ -64,13 +64,20 @@ def main():
     pressure_sensor = None
     if PRESSURE_OK:
         try:
-            pressure_sensor = ms5837.MS5837_30BA(1) # i2c-1 portunda olduğunu belirtmiştin
-            if pressure_sensor.init():
-                pressure_sensor.setFluidDensity(ms5837.DENSITY_FRESHWATER)
+            temp_sensor = ms5837.MS5837_30BA(1) # i2c-1 portunda
+            init_success = False
+            for _ in range(5):
+                if temp_sensor.init():
+                    init_success = True
+                    break
+                time.sleep(0.5)
+                
+            if init_success:
+                temp_sensor.setFluidDensity(ms5837.DENSITY_FRESHWATER)
+                pressure_sensor = temp_sensor
                 print("✅ Basınç Sensörü (MS5837) I2C-1 üzerinden bağlandı")
             else:
                 print("❌ Basınç Sensörü başlatılamadı! (Bağlantıyı kontrol edin)")
-                pressure_sensor = None
         except Exception as e:
             print(f"❌ Basınç Sensörü hatası: {e}")
 
