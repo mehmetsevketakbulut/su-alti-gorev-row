@@ -94,12 +94,12 @@ class BNO085Publisher(Node):
                 )
 
                 # Sensör raporlarını etkinleştir
-                self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+                self.bno.enable_feature(BNO_REPORT_GAME_ROTATION_VECTOR)
                 self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
                 self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
 
                 self.get_logger().info(
-                    "  📡 Aktif raporlar: ROTATION_VECTOR + ACCELEROMETER + GYROSCOPE\n"
+                    "  📡 Aktif raporlar: GAME_ROTATION_VECTOR + ACCELEROMETER + GYROSCOPE\n"
                     "  🎯 Donanımsal sensör füzyonu (Hillcrest FSP) aktif\n"
                     f"  🔄 Yayın frekansı: {publish_rate} Hz"
                 )
@@ -136,7 +136,7 @@ class BNO085Publisher(Node):
         try:
             # ── Quaternion (Donanımsal Sensör Füzyonu) ────────────────────
             # BNO085 quaternion: (i, j, k, real) formatında döner
-            quat = self.bno.quaternion
+            quat = self.bno.game_quaternion
             if quat is not None and quat[0] is not None:
                 quat_i, quat_j, quat_k, quat_real = quat
                 # ROS 2 Imu mesajı: (x, y, z, w) formatında
