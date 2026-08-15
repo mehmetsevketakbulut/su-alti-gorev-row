@@ -183,6 +183,7 @@ class AutonomousDriverNode(Node):
         self._current_yaw_deg = 0.0
         self._emergency_counter = 0
         self._emergency_pullback_frames = 0
+        self._distance_critical_counter = 0
 
         # Hat sonu stabilizasyon zamanlayıcısı
         self._end_of_line_start_time = None
@@ -290,8 +291,8 @@ class AutonomousDriverNode(Node):
             'distance_pid_ki':             0.001,
             'distance_pid_kd':             0.003,
             'distance_pid_integral_limit': 50.0,
-            'target_distance_cm':          25.0,    # Tahtadan hedef mesafe (cm)
-            'critical_distance_cm':        10.0,    # Acil kaçış mesafesi (cm)
+            'target_distance_cm':          35.0,    # Tahtadan hedef mesafe (cm)
+            'critical_distance_cm':        15.0,    # Acil kaçış mesafesi (cm)
             'max_safe_distance_cm':        100.0,   # Bu üzerinde çizgi görülmez
             'invert_vertical':             False,   # Dikey yön ters ise True yap
 
@@ -537,14 +538,23 @@ class AutonomousDriverNode(Node):
 
         # ─── ACİL DURUM: Çok yakın! ─────────────────────────────────
         if distance < critical:
-            self.get_logger().error(
-                f'🚨 ACİL! Mesafe {distance:.1f} cm < {critical:.1f} cm! '
-                f'YUKARI ÇEKİL!'
-            )
-            emergency_speed = 1.0  # Maksimum güçle yukarı
-            if self.p['invert_vertical']:
-                emergency_speed = -emergency_speed
-            return emergency_speed, True
+            self._distance_critical_counter += 1
+            if self._distance_critical_counter >= 3:
+                self.get_logger().error(
+                    f'🚨 ACİL! Mesafe {distance:.1f} cm < {critical:.1f} cm! '
+                    f'YUKARI ÇEKİL!'
+                )
+                emergency_speed = 1.0  # Maksimum güçle yukarı
+                if self.p['invert_vertical']:
+                    emergency_speed = -emergency_speed
+                return emergency_speed, True
+            else:
+                self.get_logger().warn(
+                    f'⚠️ Kritik mesafe ihlali ({distance:.1f} cm). Doğrulama bekleniyor '
+                    f'({self._distance_critical_counter}/3)...'
+                )
+        else:
+            self._distance_critical_counter = 0
 
         # ─── Normal PID kontrolü ─────────────────────────────────────
         error = target - distance
