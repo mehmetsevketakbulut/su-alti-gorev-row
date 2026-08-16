@@ -182,6 +182,17 @@ def generate_launch_description():
         }]
     )
 
+    # ── ROS2 Video Streamer Node (Ground Station için İşlenmiş Görüntü Yayını) ──
+    ros2_video_streamer_node = Node(
+        package='rov_vision',
+        executable='ros2_video_streamer',
+        name='ros2_video_streamer',
+        output='screen',
+        parameters=[{
+            'image_topic': '/line_follower/debug_image'
+        }]
+    )
+
     return LaunchDescription([
         camera_topic_arg,
         video_source_arg,
@@ -197,4 +208,5 @@ def generate_launch_description():
         imu_publisher_node,
         distance_publisher_node,
         autonomous_driver_node,
+        ros2_video_streamer_node
     ])

@@ -22,29 +22,60 @@ class VideoPublisher(Node):
         # Kamera veya Video Dosyası açma
         self.is_file = False
         try:
-            # Eğer sayıysa (0, 1, 2) webcam olarak aç
             source_id = int(video_source)
-            self.cap = cv2.VideoCapture(source_id)
-            # V4L2 ve MJPG ayarları (Webcam için)
-            self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            self.cap.set(cv2.CAP_PROP_FPS, 20)
-            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            self.cap = self._find_working_camera(source_id)
         except ValueError:
-            # Sayı değilse (harf/yol içeriyorsa) video dosyası olarak aç
             self.cap = cv2.VideoCapture(video_source)
             self.is_file = True
 
-        if not self.cap.isOpened():
+        if self.cap is None or not self.cap.isOpened():
             self.get_logger().error(f"❌ Video kaynağı açılamadı: {video_source}")
-            # Kamera açılamadıysa timer'ı durdur ki sürekli hata basmasın
             self.timer.cancel()
         else:
             if self.is_file:
                 self.get_logger().info(f"🎞️ Video dosyasından yayın başladı: {video_source}")
             else:
                 self.get_logger().info(f"✅ USB Kamera yayını başladı (ID: {video_source})")
+
+    def _find_working_camera(self, default_id):
+        self.get_logger().info("🚀 OpenCV Brute-Force Kamera Tarayıcısı Başlatılıyor...")
+        
+        # Sadece default_id'yi değil, video0-3 arasını tara
+        for i in range(4):
+            # 1. Deneme: V4L2 + MJPG
+            cap = cv2.VideoCapture(i, cv2.CAP_V4L2)
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                ret, frame = cap.read()
+                if ret and frame is not None and len(frame.shape) == 3:
+                    self.get_logger().info(f"✅ KAMERA BULUNDU: /dev/video{i} (V4L2 + MJPG - Kusursuz Renk)")
+                    return cap
+                cap.release()
+                
+            # 2. Deneme: V4L2 + YUYV
+            cap = cv2.VideoCapture(i, cv2.CAP_V4L2)
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'YUYV'))
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                ret, frame = cap.read()
+                if ret and frame is not None and len(frame.shape) == 3:
+                    self.get_logger().info(f"✅ KAMERA BULUNDU: /dev/video{i} (V4L2 + YUYV - Kusursuz Renk)")
+                    return cap
+                cap.release()
+                
+            # 3. Deneme: OpenCV Default
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                ret, frame = cap.read()
+                if ret and frame is not None:
+                    self.get_logger().warn(f"⚠️ KAMERA BULUNDU: /dev/video{i} (OpenCV Default)")
+                    return cap
+                cap.release()
+                
+        return None
 
     def timer_callback(self):
         ret, frame = self.cap.read()

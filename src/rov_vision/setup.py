@@ -37,6 +37,7 @@ setup(
             'test_serial = rov_vision.test_serial_jetson:main',
             'pressure_publisher = rov_vision.pressure_publisher:main',
             'imu_publisher = rov_vision.imu_publisher:main',
+            'ros2_video_streamer = rov_vision.ros2_video_streamer:main',
         ],
     },
 )
