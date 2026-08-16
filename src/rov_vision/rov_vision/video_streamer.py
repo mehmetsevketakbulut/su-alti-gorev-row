@@ -13,7 +13,7 @@ print("🚀 [MANUEL YUYV] Pembe Ekran Düzeltici başlatılıyor...")
 cap = cv2.VideoCapture(1)
 
 # OpenCV'nin bozuk renk dönüştürücüsünü kapatıyoruz (Böylece bize ham pembe değil, YUYV verisi gelecek)
-cap.set(cv2.CAP_PROP_CONVERT_RGB, False)
+cap.set(cv2.CAP_PROP_CONVERT_RGB, 0.0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
