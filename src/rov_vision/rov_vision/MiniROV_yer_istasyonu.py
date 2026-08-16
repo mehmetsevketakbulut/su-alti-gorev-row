@@ -16,26 +16,20 @@ POWER_LIMIT = 75
 class CameraThread:
     def __init__(self):
         self.cap = None
-        self.src_id = -1
+        self.src_id = "http://192.168.1.10:5000/video"
         
-        # 0'dan 3'e kadar olan kameraları dene (BlueOS sistemlerinde video1 veya video2 olabilir)
-        for i in range(4):
-            temp_cap = cv2.VideoCapture(i)
-            if temp_cap.isOpened():
-                ret, _ = temp_cap.read()
-                if ret:
-                    self.cap = temp_cap
-                    self.src_id = i
-                    print(f"✅ [KAMERA] Başarıyla açıldı: /dev/video{i}")
-                    break
-            temp_cap.release()
-            
-        if self.cap is None:
-            print("❌ [HATA] Hiçbir USB kamera bulunamadı veya açılamadı!")
+        # Wi-Fi üzerinden (Jetson'dan) gelen yayını açmayı dener
+        print(f"📡 [KAMERA] Jetson IP adresinden yayın aranıyor: {self.src_id}")
+        self.cap = cv2.VideoCapture(self.src_id)
+        
+        if self.cap.isOpened():
+            print("✅ [KAMERA] Jetson yayını başarıyla alındı!")
+        else:
+            print("❌ [HATA] Jetson yayınına bağlanılamadı. video_streamer.py çalışıyor mu?")
             self.cap = cv2.VideoCapture(-1) # Hata vermemesi için boş obje
 
-        # Çözünürlük dayatması bazı kameralarda hataya yol açar, OpenCV bunu destekliyorsa yapar
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        # İnternet yayını olduğu için çözünürlüğü yayıncı (Jetson) belirler, burada dayatmaya gerek yok
+        # self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
         
         self.ret = False
