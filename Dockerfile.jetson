@@ -1,0 +1,8 @@
+# Jetpack 4.6 (Jetson Nano) için ROS Foxy tabanlı donanım hızlandırmalı imaj
+FROM dustynv/ros:foxy-desktop-l4t-r32.7.1
+
+# Sensör kütüphanelerini kalıcı olarak kur (Havuzda İNTERNETSİZ çalışabilmesi için hayati önem taşır)
+RUN pip3 install pyserial adafruit-circuitpython-bno08x ms5837
+
+# Konteyner açıldığında başlayacağı klasör
+WORKDIR /workspace/su-alti-gorev-row
