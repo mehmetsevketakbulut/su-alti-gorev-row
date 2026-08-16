@@ -7,9 +7,12 @@ app = Flask(__name__)
 cap = None
 camera_id = -1
 
+import numpy as np
+
 # Otomatik Kamera Bulucu ve Pembe Ekran (MJPG) Çözücü
 for i in range(4):
-    temp_cap = cv2.VideoCapture(i)
+    # V4L2 backend'ini zorluyoruz
+    temp_cap = cv2.VideoCapture(i, cv2.CAP_V4L2)
     if temp_cap.isOpened():
         # Jetson'da YUV formatı bazen pembe/yeşil ekran verir. Zorla MJPG istiyoruz:
         temp_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
@@ -18,9 +21,16 @@ for i in range(4):
         
         ret, frame = temp_cap.read()
         if ret and frame is not None:
+            # Görüntü tamamen düz bir renk mi? (Örn: Dümdüz pembe veya yeşil)
+            # Standart sapması (varyansı) 1.0'dan küçükse bu gerçek bir kamera değil, sahte/boş bir kanaldır.
+            if np.std(frame) < 2.0:
+                print(f"⚠️ /dev/video{i} SAHTE (PEMBE/BOŞ) KANAL ÇIKTI. Atlanıyor...")
+                temp_cap.release()
+                continue
+                
             cap = temp_cap
             camera_id = i
-            print(f"✅ KULLANILIYOR: /dev/video{camera_id}")
+            print(f"✅ GERÇEK KAMERA BULUNDU: /dev/video{camera_id}")
             break
     temp_cap.release()
 
