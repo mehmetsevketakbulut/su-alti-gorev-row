@@ -16,22 +16,19 @@ cap = None
 camera_id = -1
 
 # USB Dönüştürücüler genellikle sadece tek bir çözünürlüğü (Örn 1920x1080) destekler.
-# Eğer yanlış çözünürlük sorarsak gerçek kamera (video0) çöker, kod gidip sahte kamerayı (video1) açar.
-# Bu yüzden her port için olası tüm çözünürlükleri deneyeceğiz!
 resolutions_to_try = [(1920, 1080), (1280, 720), (640, 480)]
 
 for i in range(4):
     for w, h in resolutions_to_try:
         temp_cap = cv2.VideoCapture(i)
         if temp_cap.isOpened():
+            # YUV420P ve FFMPEG beyaz ekran (8UC1) hatasını engellemek için RAW okuma modunu açıyoruz
+            temp_cap.set(cv2.CAP_PROP_CONVERT_RGB, 0.0)
             temp_cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
             temp_cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
             
-            # Görüntüyü oku
             ret, frame = temp_cap.read()
             
-            # Hem görüntü var mı, hem de SAHTE (bembeyaz/yemyeşil/pembe) değil mi diye kontrol et
-            # Standart sapma > 10.0 ise bu gerçek dünyayı gören bir kameradır!
             if ret and frame is not None and np.std(frame) > 10.0:
                 print(f"✅ GERÇEK KAMERA BULUNDU: /dev/video{i} (Çözünürlük: {w}x{h})")
                 cap = temp_cap
@@ -54,6 +51,17 @@ def generate_frames():
             import time
             time.sleep(0.1)
             continue
+            
+        # RAW okuduğumuz için manuel renk çevirisi (Pembe/Beyaz ekran çözümü)
+        try:
+            if len(frame.shape) == 2 or frame.shape[2] == 1:
+                h, w = frame.shape[0], frame.shape[1]
+                # YUYV formatı genişliğin 2 katı byte içerir
+                frame = frame.reshape((h, w//2, 2))
+                frame = cv2.cvtColor(frame, cv2.COLOR_YUV2BGR_YUYV)
+        except Exception as e:
+            pass
+
         
         # Olası aşırı büyük çözünürlükleri ağdan geçebilsin diye ufaltıyoruz
         frame = cv2.resize(frame, (640, 480))
