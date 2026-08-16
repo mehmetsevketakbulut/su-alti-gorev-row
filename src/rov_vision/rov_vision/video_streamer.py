@@ -11,9 +11,13 @@ import numpy as np
 
 # USB Dönüştürücü (Capture Card) için esnek tarama
 for i in range(4):
-    # V4L2 zorlamasını kaldırdık, çünkü dönüştürücüler desteklemeyebilir
     temp_cap = cv2.VideoCapture(i)
     if temp_cap.isOpened():
+        # ÇÖZÜM: USB Dönüştürücüler varsayılan düşük çözünürlükleri reddedip "No such device" hatası vererek çöker.
+        # Bu yüzden okumadan önce 1280x720 (veya 1920x1080) dayatması YAPMAK ZORUNDAYIZ.
+        temp_cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        temp_cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        
         ret, frame = temp_cap.read()
         if ret and frame is not None:
             # Görüntü pembe/boş mu kontrolü
