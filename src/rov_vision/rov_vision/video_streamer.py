@@ -1,68 +1,65 @@
-from flask import Flask, Response
-import cv2
-import threading
+import subprocess
 import time
+from flask import Flask, Response
 
 app = Flask(__name__)
-cap = None
-camera_id = -1
 
-import numpy as np
-
-print("🚀 [V4L2 NATIVE] YUYV Format Zorlayıcı Başlatılıyor...")
-
-# Dönüştürücülerin %99'u YUYV formatındadır ve V4L2 ile açılmalıdır.
-# FFMPEG (8UC1 beyaz ekran) hatasını atlamak için V4L2'yi ZORLUYORUZ.
-camera_id = 1
-cap = cv2.VideoCapture(camera_id, cv2.CAP_V4L2)
-
-if cap.isOpened():
-    # Kameranın aklını karıştırmamak için doğrudan YUYV formatı istiyoruz
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'YUYV'))
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-    
-    ret, frame = cap.read()
-    if ret and frame is not None:
-        print(f"✅ V4L2 BAŞARILI: /dev/video{camera_id} (Çözünürlük: {frame.shape})")
-    else:
-        print(f"❌ V4L2 Okuma Hatası (DQBUF)! Alternatif deneniyor...")
-        cap.release()
-        cap = None
-else:
-    cap = None
-
-if cap is None:
-    print("⚠️ video1 V4L2 ile açılamadı. FFMPEG olmadan sadece cv2 ile deneniyor...")
-    cap = cv2.VideoCapture(1)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+def find_working_camera():
+    # video0'dan video3'e kadar çalışan kamerayı bul
+    for i in range(4):
+        dev = f"/dev/video{i}"
+        # FFMPEG'in bu cihaza erişip erişemediğini test et
+        cmd = ['ffmpeg', '-y', '-f', 'v4l2', '-i', dev, '-vframes', '1', '-f', 'null', '-']
+        ret = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if ret.returncode == 0:
+            return dev
+    return None
 
 def generate_frames():
-    while True:
-        success, frame = cap.read()
-        if not success or frame is None:
-            import time
-            time.sleep(0.1)
-            continue
-            
-        # RAW okuduğumuz için manuel renk çevirisi (Pembe/Beyaz ekran çözümü)
-        try:
-            if len(frame.shape) == 2 or frame.shape[2] == 1:
-                h, w = frame.shape[0], frame.shape[1]
-                # YUYV formatı genişliğin 2 katı byte içerir
-                frame = frame.reshape((h, w//2, 2))
-                frame = cv2.cvtColor(frame, cv2.COLOR_YUV2BGR_YUYV)
-        except Exception as e:
-            pass
+    dev = find_working_camera()
+    if not dev:
+        print("❌ HİÇBİR KAMERA BULUNAMADI! Kabloyu kontrol edin.")
+        # Çökmemesi için boş yayın
+        while True:
+            time.sleep(1)
+            yield b''
 
+    print(f"✅ GERÇEK KAMERA BULUNDU (FFMPEG): {dev}")
+    
+    # OpenCV'nin tüm bug'larını (pembe ekran, beyaz ekran, çökmeler) aşmak için 
+    # doğrudan sistemin kalbi olan FFMPEG'i kullanıyoruz!
+    command = [
+        'ffmpeg',
+        '-f', 'v4l2',
+        '-i', dev,
+        '-s', '1280x720',
+        '-c:v', 'mjpeg',
+        '-q:v', '5', # Yüksek kalite
+        '-f', 'image2pipe',
+        '-'
+    ]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    
+    buffer = b''
+    while True:
+        chunk = process.stdout.read(8192)
+        if not chunk:
+            print("❌ FFMPEG yayını koptu!")
+            break
+        buffer += chunk
         
-        # Olası aşırı büyük çözünürlükleri ağdan geçebilsin diye ufaltıyoruz
-        frame = cv2.resize(frame, (640, 480))
-        ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
-        frame_bytes = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        # JPEG başlangıç (FF D8) ve bitiş (FF D9) baytlarını bul
+        start = buffer.find(b'\xff\xd8')
+        end = buffer.find(b'\xff\xd9')
+        
+        if start != -1 and end != -1 and end > start:
+            # Tam bir JPEG karesi yakalandı
+            jpg = buffer[start:end+2]
+            # Okunan kısmı buffer'dan sil
+            buffer = buffer[end+2:]
+            
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
 
 @app.route('/video')
 def video_feed():
