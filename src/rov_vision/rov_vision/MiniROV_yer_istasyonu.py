@@ -117,8 +117,8 @@ def main():
     print("✅ [SİSTEM] PyGame başlatılıyor...")
     pygame.init()
     try:
-        # FULLSCREEN bazen Linux'ta sessizce çökmeye neden olur, bu yüzden normal pencere açıyoruz
-        screen = pygame.display.set_mode((1280, 720))
+        # Artık Windows'ta olduğumuz için rahatça FULLSCREEN yapabiliriz, tüm paneller sığacak!
+        screen = pygame.display.set_mode((1920, 1080), pygame.FULLSCREEN)
         print("✅ [SİSTEM] PyGame ekranı başarıyla oluşturuldu.")
     except Exception as e:
         print(f"❌ [HATA] Ekran açılamadı: {e}")
