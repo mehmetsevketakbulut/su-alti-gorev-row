@@ -9,41 +9,35 @@ camera_id = -1
 
 import numpy as np
 
-# Jetson'da USB Dönüştürücüler (YUYV formatı) OpenCV ile direkt açıldığında PEMBE/YEŞİL glitch verir.
-# Bunu çözmenin tek yolu GStreamer kullanmaktır.
-gst_pipeline = (
-    "v4l2src device=/dev/video1 ! "
-    "video/x-raw, width=1280, height=720 ! "
-    "videoconvert ! "
-    "video/x-raw, format=BGR ! "
-    "appsink drop=1"
-)
+print("🚀 [MANUEL YUYV] Pembe Ekran Düzeltici başlatılıyor...")
+cap = cv2.VideoCapture(1)
 
-print("🚀 [GSTREAMER] Pembe Ekran Düzeltici (YUYV->BGR) başlatılıyor...")
-cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
+# OpenCV'nin bozuk renk dönüştürücüsünü kapatıyoruz (Böylece bize ham pembe değil, YUYV verisi gelecek)
+cap.set(cv2.CAP_PROP_CONVERT_RGB, False)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
-if cap.isOpened():
-    camera_id = 1
-    print("✅ GERÇEK KAMERA BULUNDU (GStreamer): /dev/video1")
-else:
-    print("❌ GStreamer ile açılamadı, standart metoda dönülüyor...")
-    # Yedek plan
-    cap = cv2.VideoCapture(1)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-
-if cap is None:
-    print("❌ HİÇBİR KAMERA BULUNAMADI! Lütfen USB kablosunu kontrol edin.")
-    # Kodun çökmemesi için sahte kamera aç
+if not cap.isOpened():
+    print("❌ Kamera açılamadı! Lütfen kabloyu kontrol edin.")
     cap = cv2.VideoCapture(-1)
 
 def generate_frames():
     while True:
         success, frame = cap.read()
         if not success or frame is None:
+            import time
             time.sleep(0.1)
             continue
         
+        # Ham YUYV verisini bizim kendi yöntemimizle düzgün renklere (BGR) çeviriyoruz
+        try:
+            # Gelen ham veri tek kanallı gibi görünür, onu YUV'dan BGR'a manuel çeviriyoruz
+            if len(frame.shape) == 2 or frame.shape[2] == 1:
+                frame = frame.reshape((720, 1280, 2)) # YUYV yapısı
+                frame = cv2.cvtColor(frame, cv2.COLOR_YUV2BGR_YUYV)
+        except Exception as e:
+            pass # Eğer zaten BGR geldiyse veya boyut uymadıysa elleme
+            
         # Olası aşırı büyük çözünürlükleri ağdan geçebilsin diye ufaltıyoruz
         frame = cv2.resize(frame, (640, 480))
         ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
