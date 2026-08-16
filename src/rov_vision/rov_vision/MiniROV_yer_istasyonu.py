@@ -114,10 +114,18 @@ def main():
     sock.bind((UDP_IP, UDP_PORT))
     sock.setblocking(False)
 
+    import ctypes
+    try:
+        # Windows Ölçeklendirme (DPI) sorununu çözmek için (Örn: %125 ölçek)
+        ctypes.windll.user32.SetProcessDPIAware()
+    except:
+        pass
+        
     print("✅ [SİSTEM] PyGame başlatılıyor...")
     pygame.init()
     try:
         # Artık Windows'ta olduğumuz için rahatça FULLSCREEN yapabiliriz, tüm paneller sığacak!
+        # DPI ayarı sayesinde ekran %150 ölçekli olsa bile kesilmeyecek
         screen = pygame.display.set_mode((1920, 1080), pygame.FULLSCREEN)
         print("✅ [SİSTEM] PyGame ekranı başarıyla oluşturuldu.")
     except Exception as e:
