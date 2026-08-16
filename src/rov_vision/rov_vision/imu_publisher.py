@@ -88,29 +88,46 @@ class BNO085Publisher(Node):
                     i2c = busio.I2C(board.SCL, board.SDA, frequency=400000)
 
                 self.bno = BNO08X_I2C(i2c, address=self.i2c_address)
-
+                
                 self.get_logger().info(
-                    f"✅ BNO085 baslatildi! I2C Adres: 0x{self.i2c_address:02X}"
+                    f"✅ BNO085 baslatildi! I2C Adres: 0x{self.i2c_address:02X}. Ozonlanıyor..."
                 )
+                
+                # Sensörün tam uyanması için bekle (BNO085 boot süresi)
+                time.sleep(0.5)
 
-                # Sensör raporlarını etkinleştir
-                try:
-                    self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
-                except Exception as e:
-                    self.get_logger().warn(f"ROTATION_VECTOR aktifleştirilemedi: {e}")
-                    
-                try:
-                    self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
-                except Exception as e:
-                    self.get_logger().warn(f"ACCELEROMETER aktifleştirilemedi: {e}")
-                    
-                try:
-                    self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
-                except Exception as e:
-                    self.get_logger().warn(f"GYROSCOPE aktifleştirilemedi: {e}")
+                # Sensör raporlarını etkinleştir (3 kez deneme şansı)
+                max_retries = 3
+                for attempt in range(max_retries):
+                    success = True
+                    try:
+                        self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+                    except Exception as e:
+                        success = False
+                        if attempt == max_retries - 1:
+                            self.get_logger().warn(f"ROTATION_VECTOR aktifleştirilemedi: {e}")
+                            
+                    try:
+                        self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+                    except Exception as e:
+                        if attempt == max_retries - 1:
+                            self.get_logger().warn(f"ACCELEROMETER aktifleştirilemedi: {e}")
+                            
+                    try:
+                        self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
+                    except Exception as e:
+                        if attempt == max_retries - 1:
+                            self.get_logger().warn(f"GYROSCOPE aktifleştirilemedi: {e}")
+                            
+                    if success:
+                        self.get_logger().info(f"✅ BNO085 özellikleri {attempt+1}. denemede başarıyla etkinleştirildi!")
+                        break
+                    else:
+                        self.get_logger().warn(f"⚠️ BNO085 özellikleri etkinleştirilemedi, tekrar deneniyor ({attempt+1}/{max_retries})...")
+                        time.sleep(1.0)
 
                 self.get_logger().info(
-                    "  📡 Sensör raporları etkinleştirilmeye çalışıldı.\n"
+                    "  📡 Sensör raporları etkinleştirilme denemeleri tamamlandı.\n"
                     "  🎯 Donanımsal sensör füzyonu (Hillcrest FSP) aktif\n"
                     f"  🔄 Yayın frekansı: {publish_rate} Hz"
                 )
