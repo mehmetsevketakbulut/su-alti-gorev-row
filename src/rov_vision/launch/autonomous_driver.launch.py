@@ -41,7 +41,7 @@ def generate_launch_description():
         description='İleri hız (m/s) — yarışmada 0.10-0.20 arası dene'
     )
     target_distance_arg = DeclareLaunchArgument(
-        'target_distance_cm', default_value='25.0',
+        'target_distance_cm', default_value='35.0',
         description='Tahtadan hedef mesafe (cm) — havuzda kalibre et'
     )
     power_limit_arg = DeclareLaunchArgument(
@@ -127,7 +127,7 @@ def generate_launch_description():
             'distance_pid_kd':             0.003,
             'distance_pid_integral_limit': 50.0,
             'target_distance_cm':          LaunchConfiguration('target_distance_cm'),
-            'critical_distance_cm':        10.0,    # Bu altında ACİL!
+            'critical_distance_cm':        15.0,    # Bu altında ACİL!
             'max_safe_distance_cm':        100.0,
             'invert_vertical':             False,   # Dikey yön ters ise True yap
 
