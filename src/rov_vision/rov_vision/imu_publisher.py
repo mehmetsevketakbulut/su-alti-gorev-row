@@ -33,7 +33,7 @@ try:
     import busio
     from adafruit_bno08x.i2c import BNO08X_I2C
     from adafruit_bno08x import (
-        BNO_REPORT_ROTATION_VECTOR,
+        BNO_REPORT_GAME_ROTATION_VECTOR,
         BNO_REPORT_ACCELEROMETER,
         BNO_REPORT_GYROSCOPE,
     )

@@ -1,10 +1,10 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
 import cv2
 import threading
 import time
+import numpy as np
 from flask import Flask, Response
 
 # Flask Uygulaması
@@ -13,6 +13,11 @@ app = Flask(__name__)
 # Global değişkenler
 latest_frame = None
 frame_lock = threading.Lock()
+
+def imgmsg_to_cv2(msg):
+    img = np.frombuffer(msg.data, dtype=np.uint8)
+    img = img.reshape((msg.height, msg.width, 3))
+    return img
 
 class Ros2VideoStreamer(Node):
     """
@@ -23,10 +28,6 @@ class Ros2VideoStreamer(Node):
     def __init__(self):
         super().__init__('ros2_video_streamer')
         
-        # Otonom sürüşteki işlenmiş görüntüyü dinle (çizgiler, metrikler vs.)
-        # Eğer otonom sürüş kapalıysa, sadece siyah ekran veya uyarı vermemesi için
-        # aslında hem image_raw hem de debug_image dinleyip, debug_image varsa onu, 
-        # yoksa image_raw'ı da basabiliriz. Ama şimdilik doğrudan debug_image dinliyoruz.
         self.declare_parameter('image_topic', '/line_follower/debug_image')
         topic = self.get_parameter('image_topic').value
         
@@ -36,15 +37,13 @@ class Ros2VideoStreamer(Node):
             self.image_callback,
             10
         )
-        self.bridge = CvBridge()
         self.get_logger().info(f"🌐 ROS 2 Video Streamer Başlatıldı! Dinlenen Topic: {topic}")
         self.get_logger().info(f"📡 Windows laptopunuzdan bağlanın: http://<JETSON_IP>:5000/video")
         
     def image_callback(self, msg):
         global latest_frame
         try:
-            # Gelen ROS 2 mesajını OpenCV formatına (BGR) çevir
-            cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+            cv_image = imgmsg_to_cv2(msg)
             
             with frame_lock:
                 latest_frame = cv_image

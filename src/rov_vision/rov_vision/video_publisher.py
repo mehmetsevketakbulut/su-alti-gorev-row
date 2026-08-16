@@ -1,25 +1,30 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
 import cv2
+import numpy as np
+
+def cv2_to_imgmsg(cv_image, encoding="bgr8"):
+    msg = Image()
+    msg.height = cv_image.shape[0]
+    msg.width = cv_image.shape[1]
+    msg.encoding = encoding
+    msg.is_bigendian = False
+    msg.step = cv_image.shape[1] * cv_image.shape[2]
+    msg.data = cv_image.tobytes()
+    return msg
 
 class VideoPublisher(Node):
     def __init__(self):
         super().__init__('video_publisher')
         
-        # ROS2 Parametresi: Varsayılan "0" (Webcam), ama dosya yolu da verilebilir (örn: "test_video.mp4")
         self.declare_parameter('video_source', '0')
-        video_source = self.get_parameter('video_source').value
+        video_source = str(self.get_parameter('video_source').value)
         
-        # Görüntüyü yayınlayacağımız ROS 2 kanalı (topic)
         self.publisher_ = self.create_publisher(Image, '/camera/image_raw', 10)
         
-        # Saniyede 20 kare (20 FPS) için 0.05 saniyelik zamanlayıcı
         self.timer = self.create_timer(0.05, self.timer_callback)
-        self.bridge = CvBridge()
         
-        # Kamera veya Video Dosyası açma
         self.is_file = False
         try:
             source_id = int(video_source)
@@ -40,7 +45,6 @@ class VideoPublisher(Node):
     def _find_working_camera(self, default_id):
         self.get_logger().info("🚀 OpenCV Brute-Force Kamera Tarayıcısı Başlatılıyor...")
         
-        # Sadece default_id'yi değil, video0-3 arasını tara
         for i in range(4):
             # 1. Deneme: V4L2 + MJPG
             cap = cv2.VideoCapture(i, cv2.CAP_V4L2)
@@ -80,11 +84,8 @@ class VideoPublisher(Node):
     def timer_callback(self):
         ret, frame = self.cap.read()
         if ret:
-            # Yüksek çözünürlüklü telefon videoları sistemi inanılmaz yavaşlatır!
-            # Yayınlamadan önce her zaman 640x480'e küçült.
             frame = cv2.resize(frame, (640, 480))
-            
-            msg = self.bridge.cv2_to_imgmsg(frame, "bgr8")
+            msg = cv2_to_imgmsg(frame, "bgr8")
             self.publisher_.publish(msg)
         else:
             if self.is_file:

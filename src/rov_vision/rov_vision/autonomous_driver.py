@@ -42,7 +42,6 @@ import threading
 from sensor_msgs.msg import Image, Imu
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Float32, String
-from cv_bridge import CvBridge
 
 import cv2
 import numpy as np
@@ -57,6 +56,20 @@ from rov_vision.line_follower import (
     LineDetector,
 )
 
+def imgmsg_to_cv2(msg):
+    img = np.frombuffer(msg.data, dtype=np.uint8)
+    img = img.reshape((msg.height, msg.width, 3))
+    return img
+
+def cv2_to_imgmsg(cv_image, encoding="bgr8"):
+    msg = Image()
+    msg.height = cv_image.shape[0]
+    msg.width = cv_image.shape[1]
+    msg.encoding = encoding
+    msg.is_bigendian = False
+    msg.step = cv_image.shape[1] * cv_image.shape[2]
+    msg.data = cv_image.tobytes()
+    return msg
 
 # =============================================================================
 # YARDIMCI FONKSİYONLAR
@@ -120,8 +133,7 @@ class AutonomousDriverNode(Node):
             hsv_lower=tuple(p['hsv_lower']),
             hsv_upper=tuple(p['hsv_upper']),
             min_contour_area=p['min_contour_area'],
-            roi_top_ratio=p['roi_top_ratio'],
-            min_aspect_ratio=p['min_aspect_ratio']
+            roi_top_ratio=p['roi_top_ratio']
         )
 
         # ── PID Kontrolcüleri ───────────────────────────────────────────
@@ -162,7 +174,6 @@ class AutonomousDriverNode(Node):
         self.last_cx = None
         self.last_error = 0.0
         self.lost_counter = 0
-        self.bridge = CvBridge()
 
         # Takip sayacı (hat sonu algılama için)
         self.following_counter = 0
@@ -629,9 +640,9 @@ class AutonomousDriverNode(Node):
 
         # ── ROS Image → OpenCV ────────────────────────────────────────
         try:
-            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            frame = imgmsg_to_cv2(msg)
         except Exception as e:
-            self.get_logger().error(f'cv_bridge hatası: {e}')
+            self.get_logger().error(f'Görüntü dönüştürme hatası: {e}')
             return
 
         h, w = frame.shape[:2]
@@ -862,7 +873,7 @@ class AutonomousDriverNode(Node):
     def _publish_debug(self, frame, header):
         """Debug görüntüsünü yayınlar."""
         try:
-            debug_msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
+            debug_msg = cv2_to_imgmsg(frame, encoding='bgr8')
             debug_msg.header = header
             self.debug_pub.publish(debug_msg)
         except Exception:
