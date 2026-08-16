@@ -5,18 +5,19 @@ from flask import Flask, Response
 app = Flask(__name__)
 
 def find_working_camera():
-    # video0'dan video3'e kadar çalışan kamerayı bul
+    print("🚀 FFMPEG ile çalışan kamera aranıyor...")
     for i in range(4):
         dev = f"/dev/video{i}"
-        # FFMPEG'in bu cihaza erişip erişemediğini test et
         cmd = ['ffmpeg', '-y', '-f', 'v4l2', '-i', dev, '-vframes', '1', '-f', 'null', '-']
         ret = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         if ret.returncode == 0:
             return dev
     return None
 
+WORKING_CAMERA = find_working_camera()
+
 def generate_frames():
-    dev = find_working_camera()
+    dev = WORKING_CAMERA
     if not dev:
         print("❌ HİÇBİR KAMERA BULUNAMADI! Kabloyu kontrol edin.")
         # Çökmemesi için boş yayın
