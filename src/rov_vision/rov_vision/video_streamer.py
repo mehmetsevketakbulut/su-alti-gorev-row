@@ -9,40 +9,34 @@ camera_id = -1
 
 import numpy as np
 
-import numpy as np
+print("🚀 [V4L2 NATIVE] YUYV Format Zorlayıcı Başlatılıyor...")
 
-print("🚀 Akıllı Kamera ve Çözünürlük Tarayıcı Başlatılıyor...")
-cap = None
-camera_id = -1
+# Dönüştürücülerin %99'u YUYV formatındadır ve V4L2 ile açılmalıdır.
+# FFMPEG (8UC1 beyaz ekran) hatasını atlamak için V4L2'yi ZORLUYORUZ.
+camera_id = 1
+cap = cv2.VideoCapture(camera_id, cv2.CAP_V4L2)
 
-# USB Dönüştürücüler genellikle sadece tek bir çözünürlüğü (Örn 1920x1080) destekler.
-resolutions_to_try = [(1920, 1080), (1280, 720), (640, 480)]
-
-for i in range(4):
-    for w, h in resolutions_to_try:
-        temp_cap = cv2.VideoCapture(i)
-        if temp_cap.isOpened():
-            # YUV420P ve FFMPEG beyaz ekran (8UC1) hatasını engellemek için RAW okuma modunu açıyoruz
-            temp_cap.set(cv2.CAP_PROP_CONVERT_RGB, 0.0)
-            temp_cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
-            temp_cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
-            
-            ret, frame = temp_cap.read()
-            
-            if ret and frame is not None and np.std(frame) > 10.0:
-                print(f"✅ GERÇEK KAMERA BULUNDU: /dev/video{i} (Çözünürlük: {w}x{h})")
-                cap = temp_cap
-                camera_id = i
-                break
-            
-            temp_cap.release()
+if cap.isOpened():
+    # Kameranın aklını karıştırmamak için doğrudan YUYV formatı istiyoruz
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'YUYV'))
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     
-    if cap is not None:
-        break
+    ret, frame = cap.read()
+    if ret and frame is not None:
+        print(f"✅ V4L2 BAŞARILI: /dev/video{camera_id} (Çözünürlük: {frame.shape})")
+    else:
+        print(f"❌ V4L2 Okuma Hatası (DQBUF)! Alternatif deneniyor...")
+        cap.release()
+        cap = None
+else:
+    cap = None
 
 if cap is None:
-    print("❌ Kamera bulunamadı, sahte yayın başlatılıyor...")
-    cap = cv2.VideoCapture(-1)
+    print("⚠️ video1 V4L2 ile açılamadı. FFMPEG olmadan sadece cv2 ile deneniyor...")
+    cap = cv2.VideoCapture(1)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
 def generate_frames():
     while True:
