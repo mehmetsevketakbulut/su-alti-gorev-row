@@ -18,8 +18,18 @@ class VideoPublisher(Node):
     def __init__(self):
         super().__init__('video_publisher')
         
-        self.declare_parameter('video_source', '0')
-        video_source = str(self.get_parameter('video_source').value)
+        # ROS 2 Humble parameter type inference fix
+        # Using rclpy.Parameter.Type.PARAMETER_NOT_SET allows it to accept both int and string
+        self.declare_parameter('video_source', value=rclpy.Parameter.Type.PARAMETER_NOT_SET)
+        
+        try:
+            val = self.get_parameter('video_source').value
+            if val is None or val == rclpy.Parameter.Type.PARAMETER_NOT_SET:
+                video_source = '0'
+            else:
+                video_source = str(val)
+        except Exception:
+            video_source = '0'
         
         self.publisher_ = self.create_publisher(Image, '/camera/image_raw', 10)
         
