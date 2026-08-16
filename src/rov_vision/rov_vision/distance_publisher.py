@@ -40,6 +40,29 @@ import time
 import threading
 
 
+class KalmanFilter1D:
+    """1 Boyutlu (1D) Kalman Filtresi: Sensör gürültüsünü filtreler ve pürüzsüzleştirir."""
+    def __init__(self, process_noise=0.1, measurement_noise=2.0, estimated_error=1.0):
+        self.q = process_noise       # Sistem süreç gürültüsü
+        self.r = measurement_noise   # Sensör ölçüm gürültüsü
+        self.p = estimated_error     # Başlangıç tahmini hata varyansı
+        self.x = None                # Geçerli durum tahmini
+
+    def update(self, measurement):
+        if self.x is None:
+            self.x = measurement
+            return self.x
+        
+        # Tahmin (Prediction)
+        self.p = self.p + self.q
+        
+        # Güncelleme (Update)
+        k = self.p / (self.p + self.r)       # Kalman Kazancı (Gain)
+        self.x = self.x + k * (measurement - self.x)
+        self.p = (1 - k) * self.p
+        
+        return self.x
+
 class DistancePublisher(Node):
     """
     UART akustik mesafe sensörü okuyucu.
@@ -72,6 +95,7 @@ class DistancePublisher(Node):
 
         # ── Mesafe tamponu (median filtre için) ─────────────────────────
         self._distance_buffer = []
+        self._kalman_filter = KalmanFilter1D(process_noise=0.1, measurement_noise=2.0)
 
         # ── Serial port aç ──────────────────────────────────────────────
         self.ser = None
@@ -93,7 +117,7 @@ class DistancePublisher(Node):
             f'  Protokol : {self._protocol}\n'
             f'  Menzil   : {self._min_range}-{self._max_range} cm\n'
             f'  Topic    : {topic}\n'
-            f'  Filtre   : Median ({self._filter_size} örnek)'
+            f'  Filtre   : Median ({self._filter_size} örnek) + 1D Kalman'
         )
 
     def _open_serial(self):
@@ -208,9 +232,12 @@ class DistancePublisher(Node):
         if len(self._distance_buffer) >= 3:
             sorted_buf = sorted(self._distance_buffer)
             median = sorted_buf[len(sorted_buf) // 2]
-            self._latest_distance_cm = median
+            filtered_val = median
         else:
-            self._latest_distance_cm = distance_cm
+            filtered_val = distance_cm
+
+        # Kalman Filtresinden geçir (Yumuşatma)
+        self._latest_distance_cm = self._kalman_filter.update(filtered_val)
 
     def _publish_callback(self):
         """Timer callback: son mesafe değerini ROS2 topic'ine yayınlar."""
