@@ -446,9 +446,9 @@ class AutonomousDriverNode(Node):
         Firmware format: "A,m1,m2,m3,m4,m5,m6,btn,kp,kd\n"
         - m1..m6: Motor yüzdeleri (-100 ile +100 arası)
         - btn: Kill switch (0=normal, 1=acil durdurma)
-        - kp, kd: 0, 0 (Roll kontrolü artık Jetson'da yapıldığı için Deneyap'a 0 gidiyor)
+        - kp, kd: 150, 25 (Deneyap'ın beklentisi)
         """
-        paket = f"A,{m1},{m2},{m3},{m4},{m5},{m6},{btn},0,0\n"
+        paket = f"A,{m1},{m2},{m3},{m4},{m5},{m6},{btn},150,25\n"
 
         if self.ser and self.ser.is_open:
             try:

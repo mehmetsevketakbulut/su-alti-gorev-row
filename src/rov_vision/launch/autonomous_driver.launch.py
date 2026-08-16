@@ -37,8 +37,8 @@ def generate_launch_description():
         description='Motor kontrolcü serial baud rate'
     )
     linear_speed_arg = DeclareLaunchArgument(
-        'linear_speed', default_value='0.15',
-        description='İleri hız (m/s) — yarışmada 0.10-0.20 arası dene'
+        'linear_speed', default_value='0.4',
+        description='İleri hız (0.0 - 1.0) — ESC ölü noktasını aşmak için en az 0.3 olmalı'
     )
     target_distance_arg = DeclareLaunchArgument(
         'target_distance_cm', default_value='35.0',
