@@ -1,66 +1,69 @@
-import subprocess
+import cv2
 import time
 from flask import Flask, Response
 
 app = Flask(__name__)
 
 def find_working_camera():
-    print("🚀 FFMPEG ile çalışan kamera aranıyor...")
+    print("🚀 OpenCV Brute-Force Kamera Tarayıcısı Başlatılıyor...")
     for i in range(4):
-        dev = f"/dev/video{i}"
-        cmd = ['ffmpeg', '-y', '-f', 'v4l2', '-i', dev, '-vframes', '1', '-f', 'null', '-']
-        ret = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if ret.returncode == 0:
-            return dev
+        # 1. Deneme: V4L2 + MJPG (En stabil ve renkleri en doğru format)
+        cap = cv2.VideoCapture(i, cv2.CAP_V4L2)
+        if cap.isOpened():
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            ret, frame = cap.read()
+            if ret and frame is not None and len(frame.shape) == 3:
+                print(f"✅ KAMERA BULUNDU: /dev/video{i} (V4L2 + MJPG - Kusursuz Renk)")
+                return cap
+            cap.release()
+            
+        # 2. Deneme: V4L2 + YUYV (DQBUF hatası verebilir, verirse atlar)
+        cap = cv2.VideoCapture(i, cv2.CAP_V4L2)
+        if cap.isOpened():
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'YUYV'))
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+            ret, frame = cap.read()
+            if ret and frame is not None and len(frame.shape) == 3:
+                print(f"✅ KAMERA BULUNDU: /dev/video{i} (V4L2 + YUYV - Kusursuz Renk)")
+                return cap
+            cap.release()
+            
+        # 3. Deneme: OpenCV Default (Pembe veya Siyah/Beyaz verebilir ama ASLA çökmez)
+        cap = cv2.VideoCapture(i)
+        if cap.isOpened():
+            ret, frame = cap.read()
+            if ret and frame is not None:
+                print(f"⚠️ KAMERA BULUNDU: /dev/video{i} (OpenCV Default - Renkler bozuk olabilir)")
+                return cap
+            cap.release()
+            
     return None
 
-WORKING_CAMERA = find_working_camera()
+# Sunucu başlarken kamerayı 1 KERE bulup kilitler, Windows bağlanırken Timeout olmaz!
+GLOBAL_CAP = find_working_camera()
 
 def generate_frames():
-    dev = WORKING_CAMERA
-    if not dev:
+    global GLOBAL_CAP
+    if GLOBAL_CAP is None:
         print("❌ HİÇBİR KAMERA BULUNAMADI! Kabloyu kontrol edin.")
-        # Çökmemesi için boş yayın
         while True:
             time.sleep(1)
             yield b''
 
-    print(f"✅ GERÇEK KAMERA BULUNDU (FFMPEG): {dev}")
-    
-    # OpenCV'nin tüm bug'larını (pembe ekran, beyaz ekran, çökmeler) aşmak için 
-    # doğrudan sistemin kalbi olan FFMPEG'i kullanıyoruz!
-    command = [
-        'ffmpeg',
-        '-f', 'v4l2',
-        '-i', dev,
-        '-s', '1280x720',
-        '-c:v', 'mjpeg',
-        '-q:v', '5', # Yüksek kalite
-        '-f', 'image2pipe',
-        '-'
-    ]
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    
-    buffer = b''
     while True:
-        chunk = process.stdout.read(8192)
-        if not chunk:
-            print("❌ FFMPEG yayını koptu!")
-            break
-        buffer += chunk
-        
-        # JPEG başlangıç (FF D8) ve bitiş (FF D9) baytlarını bul
-        start = buffer.find(b'\xff\xd8')
-        end = buffer.find(b'\xff\xd9')
-        
-        if start != -1 and end != -1 and end > start:
-            # Tam bir JPEG karesi yakalandı
-            jpg = buffer[start:end+2]
-            # Okunan kısmı buffer'dan sil
-            buffer = buffer[end+2:]
+        ret, frame = GLOBAL_CAP.read()
+        if not ret or frame is None:
+            time.sleep(0.1)
+            continue
             
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
+        # Olası aşırı büyük çözünürlükleri ağdan geçebilsin diye ufaltıyoruz
+        frame = cv2.resize(frame, (640, 480))
+        ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
 
 @app.route('/video')
 def video_feed():
