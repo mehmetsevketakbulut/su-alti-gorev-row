@@ -120,8 +120,15 @@ def main():
     sock.bind((UDP_IP, UDP_PORT))
     sock.setblocking(False)
 
+    print("✅ [SİSTEM] PyGame başlatılıyor...")
     pygame.init()
-    screen = pygame.display.set_mode((1920, 1080), pygame.FULLSCREEN)
+    try:
+        # FULLSCREEN bazen Linux'ta sessizce çökmeye neden olur, bu yüzden normal pencere açıyoruz
+        screen = pygame.display.set_mode((1280, 720))
+        print("✅ [SİSTEM] PyGame ekranı başarıyla oluşturuldu.")
+    except Exception as e:
+        print(f"❌ [HATA] Ekran açılamadı: {e}")
+        return
     
     font_title = pygame.font.SysFont("Consolas", 36, bold=True)
     font_header = pygame.font.SysFont("Consolas", 26, bold=True)
