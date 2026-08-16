@@ -9,28 +9,28 @@ camera_id = -1
 
 import numpy as np
 
-# USB Dönüştürücü (Capture Card) için esnek tarama
-for i in range(4):
-    temp_cap = cv2.VideoCapture(i)
-    if temp_cap.isOpened():
-        # ÇÖZÜM: USB Dönüştürücüler varsayılan düşük çözünürlükleri reddedip "No such device" hatası vererek çöker.
-        # Bu yüzden okumadan önce 1280x720 (veya 1920x1080) dayatması YAPMAK ZORUNDAYIZ.
-        temp_cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        temp_cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        
-        ret, frame = temp_cap.read()
-        if ret and frame is not None:
-            # Görüntü pembe/boş mu kontrolü
-            if np.std(frame) < 2.0:
-                print(f"⚠️ /dev/video{i} SAHTE (PEMBE/BOŞ) KANAL ÇIKTI. Atlanıyor...")
-                temp_cap.release()
-                continue
-                
-            cap = temp_cap
-            camera_id = i
-            print(f"✅ GERÇEK KAMERA BULUNDU: /dev/video{camera_id}")
-            break
-    temp_cap.release()
+# Jetson'da USB Dönüştürücüler (YUYV formatı) OpenCV ile direkt açıldığında PEMBE/YEŞİL glitch verir.
+# Bunu çözmenin tek yolu GStreamer kullanmaktır.
+gst_pipeline = (
+    "v4l2src device=/dev/video1 ! "
+    "video/x-raw, width=1280, height=720 ! "
+    "videoconvert ! "
+    "video/x-raw, format=BGR ! "
+    "appsink drop=1"
+)
+
+print("🚀 [GSTREAMER] Pembe Ekran Düzeltici (YUYV->BGR) başlatılıyor...")
+cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
+
+if cap.isOpened():
+    camera_id = 1
+    print("✅ GERÇEK KAMERA BULUNDU (GStreamer): /dev/video1")
+else:
+    print("❌ GStreamer ile açılamadı, standart metoda dönülüyor...")
+    # Yedek plan
+    cap = cv2.VideoCapture(1)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
 if cap is None:
     print("❌ HİÇBİR KAMERA BULUNAMADI! Lütfen USB kablosunu kontrol edin.")
