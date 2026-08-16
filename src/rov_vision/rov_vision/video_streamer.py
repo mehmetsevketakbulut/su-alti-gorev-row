@@ -9,16 +9,42 @@ camera_id = -1
 
 import numpy as np
 
-print("🚀 [MANUEL YUYV] Pembe Ekran Düzeltici başlatılıyor...")
-cap = cv2.VideoCapture(1)
+import numpy as np
 
-# OpenCV'nin bozuk renk dönüştürücüsünü kapatıyoruz (Böylece bize ham pembe değil, YUYV verisi gelecek)
-cap.set(cv2.CAP_PROP_CONVERT_RGB, 0.0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+print("🚀 Akıllı Kamera ve Çözünürlük Tarayıcı Başlatılıyor...")
+cap = None
+camera_id = -1
 
-if not cap.isOpened():
-    print("❌ Kamera açılamadı! Lütfen kabloyu kontrol edin.")
+# USB Dönüştürücüler genellikle sadece tek bir çözünürlüğü (Örn 1920x1080) destekler.
+# Eğer yanlış çözünürlük sorarsak gerçek kamera (video0) çöker, kod gidip sahte kamerayı (video1) açar.
+# Bu yüzden her port için olası tüm çözünürlükleri deneyeceğiz!
+resolutions_to_try = [(1920, 1080), (1280, 720), (640, 480)]
+
+for i in range(4):
+    for w, h in resolutions_to_try:
+        temp_cap = cv2.VideoCapture(i)
+        if temp_cap.isOpened():
+            temp_cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
+            temp_cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+            
+            # Görüntüyü oku
+            ret, frame = temp_cap.read()
+            
+            # Hem görüntü var mı, hem de SAHTE (bembeyaz/yemyeşil/pembe) değil mi diye kontrol et
+            # Standart sapma > 10.0 ise bu gerçek dünyayı gören bir kameradır!
+            if ret and frame is not None and np.std(frame) > 10.0:
+                print(f"✅ GERÇEK KAMERA BULUNDU: /dev/video{i} (Çözünürlük: {w}x{h})")
+                cap = temp_cap
+                camera_id = i
+                break
+            
+            temp_cap.release()
+    
+    if cap is not None:
+        break
+
+if cap is None:
+    print("❌ Kamera bulunamadı, sahte yayın başlatılıyor...")
     cap = cv2.VideoCapture(-1)
 
 def generate_frames():
@@ -29,15 +55,6 @@ def generate_frames():
             time.sleep(0.1)
             continue
         
-        # Ham YUYV verisini bizim kendi yöntemimizle düzgün renklere (BGR) çeviriyoruz
-        try:
-            # Gelen ham veri tek kanallı gibi görünür, onu YUV'dan BGR'a manuel çeviriyoruz
-            if len(frame.shape) == 2 or frame.shape[2] == 1:
-                frame = frame.reshape((720, 1280, 2)) # YUYV yapısı
-                frame = cv2.cvtColor(frame, cv2.COLOR_YUV2BGR_YUYV)
-        except Exception as e:
-            pass # Eğer zaten BGR geldiyse veya boyut uymadıysa elleme
-            
         # Olası aşırı büyük çözünürlükleri ağdan geçebilsin diye ufaltıyoruz
         frame = cv2.resize(frame, (640, 480))
         ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
