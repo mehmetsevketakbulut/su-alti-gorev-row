@@ -30,4 +30,4 @@ sudo docker run -it --rm \
     --device /dev/ttyTHS1 \
     --privileged \
     $IMAGE_NAME \
-    /bin/bash -c "cd /workspace/su-alti-gorev-row && source /opt/ros/\$ROS_DISTRO/setup.bash && echo '✅ Docker Hazır! Şimdi colcon build ve source edip kodunu çalıştırabilirsin.' && /bin/bash"
+    /bin/bash -c "cd /workspace/su-alti-gorev-row && source /opt/ros/\$ROS_DISTRO/setup.bash && echo '⚙️ Gerekli Python kütüphaneleri (Sensörler için) kuruluyor...' && pip3 install pyserial adafruit-circuitpython-bno08x ms5837 && echo '✅ Docker Hazır! Şimdi colcon build ve source edip projeyi başlatabilirsin.' && /bin/bash"
