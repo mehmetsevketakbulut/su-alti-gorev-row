@@ -94,12 +94,23 @@ class BNO085Publisher(Node):
                 )
 
                 # Sensör raporlarını etkinleştir
-                self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
-                self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
-                self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
+                try:
+                    self.bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
+                except Exception as e:
+                    self.get_logger().warn(f"ROTATION_VECTOR aktifleştirilemedi: {e}")
+                    
+                try:
+                    self.bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+                except Exception as e:
+                    self.get_logger().warn(f"ACCELEROMETER aktifleştirilemedi: {e}")
+                    
+                try:
+                    self.bno.enable_feature(BNO_REPORT_GYROSCOPE)
+                except Exception as e:
+                    self.get_logger().warn(f"GYROSCOPE aktifleştirilemedi: {e}")
 
                 self.get_logger().info(
-                    "  📡 Aktif raporlar: ROTATION_VECTOR + ACCELEROMETER + GYROSCOPE\n"
+                    "  📡 Sensör raporları etkinleştirilmeye çalışıldı.\n"
                     "  🎯 Donanımsal sensör füzyonu (Hillcrest FSP) aktif\n"
                     f"  🔄 Yayın frekansı: {publish_rate} Hz"
                 )
