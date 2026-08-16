@@ -9,20 +9,14 @@ camera_id = -1
 
 import numpy as np
 
-# Otomatik Kamera Bulucu ve Pembe Ekran (MJPG) Çözücü
+# USB Dönüştürücü (Capture Card) için esnek tarama
 for i in range(4):
-    # V4L2 backend'ini zorluyoruz
-    temp_cap = cv2.VideoCapture(i, cv2.CAP_V4L2)
+    # V4L2 zorlamasını kaldırdık, çünkü dönüştürücüler desteklemeyebilir
+    temp_cap = cv2.VideoCapture(i)
     if temp_cap.isOpened():
-        # Jetson'da YUV formatı bazen pembe/yeşil ekran verir. Zorla MJPG istiyoruz:
-        temp_cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-        temp_cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        temp_cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        
         ret, frame = temp_cap.read()
         if ret and frame is not None:
-            # Görüntü tamamen düz bir renk mi? (Örn: Dümdüz pembe veya yeşil)
-            # Standart sapması (varyansı) 1.0'dan küçükse bu gerçek bir kamera değil, sahte/boş bir kanaldır.
+            # Görüntü pembe/boş mu kontrolü
             if np.std(frame) < 2.0:
                 print(f"⚠️ /dev/video{i} SAHTE (PEMBE/BOŞ) KANAL ÇIKTI. Atlanıyor...")
                 temp_cap.release()
