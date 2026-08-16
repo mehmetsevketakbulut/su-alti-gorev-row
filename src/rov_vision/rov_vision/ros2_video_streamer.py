@@ -68,12 +68,11 @@ def generate_frames():
             time.sleep(0.1)
             continue
             
-        # Olası aşırı büyük çözünürlükleri ağdan geçebilsin diye ufaltıyoruz
-        # (Gerçi video_publisher zaten 640x480 basıyor ama güvenlik amaçlı)
-        frame = cv2.resize(frame, (640, 480))
+        # Görüntüyü biraz küçült (480x360) ve kaliteyi (40) düşürerek Wi-Fi gecikmesini yok et
+        frame = cv2.resize(frame, (480, 360))
         
-        # JPEG olarak kodla
-        ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+        # JPEG olarak kodla (Kaliteyi %40'a çekerek bant genişliği tasarrufu sağla)
+        ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 40])
         
         if not ret:
             continue
