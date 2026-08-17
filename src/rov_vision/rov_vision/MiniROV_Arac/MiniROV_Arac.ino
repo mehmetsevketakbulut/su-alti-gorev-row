@@ -1,5 +1,5 @@
 #include <ESP32Servo.h>
-#include <mcp_can.h>
+#include <mcp2515.h>
 #include <SPI.h>
 #include <Deneyap_6EksenAtaletselOlcumBirimi.h>
 #include <math.h>
@@ -17,7 +17,8 @@
 #define MIN_GUC 1236
 #define MAX_GUC 1764
 
-MCP_CAN CAN(SPI_CS);
+struct can_frame canMsg;
+MCP2515 mcp2515(SPI_CS);
 LSM6DSM IMU;
 
 Servo onsag, onsol, arsag, arsol;
@@ -47,9 +48,10 @@ void sistemiKilitle() {
 void setup() {
   Serial.begin(115200);
 
-  // CAN Modülünü başlat
-  CAN.begin(MCP_ANY, CAN_125KBPS, MCP_8MHZ);
-  CAN.setMode(MCP_NORMAL);
+  // CAN Modülünü başlat (autowp)
+  mcp2515.reset();
+  mcp2515.setBitrate(CAN_125KBPS, MCP_8MHZ);
+  mcp2515.setNormalMode();
 
   ledcSetup(9, 5000, 8); 
   ledcAttachPin(PIN_ISIK_MINI, 9);
@@ -61,9 +63,6 @@ void setup() {
   pinMode(PIN_KAPATMA, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(PIN_KAPATMA), acilKapatmaISR, FALLING);
   
-  // ==========================================
-  // YENİ: ESC RESET / ARMING SÜRECİ
-  // ==========================================
   motorlariDurdur();
   delay(3000); // ESC'lerin bipleyip kurulması için 3 saniye nötr bekle!
   motorlariDurdur();
@@ -73,36 +72,49 @@ void setup() {
 }
 
 void loop() {
-  long unsigned int rxId;
-  unsigned char len = 0;
-  unsigned char rxBuf[8];
-
   float accX = IMU.readFloatAccelX();
   float accZ = IMU.readFloatAccelZ();
   Input = atan2(accX, accZ) * 180.0 / PI;
   
-  // Basit P kontrolcü (PID_v1 kütüphanesi olmadan)
+  // Basit P kontrolcü
   double error = Setpoint - Input;
   Output = constrain(error * Kp, -300, 300);
 
-  // --- CAN BUS DİNLEME ---
-  if(CAN.checkReceive() == CAN_MSGAVAIL) {
-    CAN.readMsgBuf(&rxId, &len, rxBuf);
+  // --- CAN BUS DİNLEME (autowp mcp2515) ---
+  if (mcp2515.readMessage(&canMsg) == MCP2515::ERROR_OK) {
+    long unsigned int rxId = canMsg.can_id;
+    unsigned char len = canMsg.can_dlc;
+    unsigned char *rxBuf = canMsg.data;
     
     // Geçerli bir paket aldık, zamanlayıcıyı sıfırla!
     sonCanZamani = millis(); 
 
+    // DEBUG YAZDIRMASI:
+    Serial.print("[CAN ALINDI] ID: 0x"); Serial.print(rxId, HEX);
+    Serial.print(" Veri: ");
+    for(int i=0; i<len; i++) {
+        Serial.print(rxBuf[i]); Serial.print(" ");
+    }
+    Serial.println();
+
     if (rxId == 0x04 && len == 1) {
       yazilimsalKilit = (rxBuf[0] == 1); 
+      Serial.print(" -> YAZILIMSAL KILIT: "); Serial.println(yazilimsalKilit);
     }
     else if (rxId == 0x07 && len == 1) { 
       ledcWrite(9, map(rxBuf[0], 0, 100, 0, 255));
+      Serial.print(" -> ISIK KOMUTU: "); Serial.println(rxBuf[0]);
     }
     else if (rxId == 0x02 && len == 8) {
       int y1_batma_ham = (rxBuf[0] << 8) | rxBuf[1];
       int x1_roll_ham  = (rxBuf[2] << 8) | rxBuf[3];
       int x2_donme_ham = (rxBuf[4] << 8) | rxBuf[5];
       int y2_ileri_ham = (rxBuf[6] << 8) | rxBuf[7];
+
+      Serial.print(" -> MOTORLAR: Batma="); Serial.print(y1_batma_ham);
+      Serial.print(" Roll="); Serial.print(x1_roll_ham);
+      Serial.print(" Yaw="); Serial.print(x2_donme_ham);
+      Serial.print(" Ileri="); Serial.println(y2_ileri_ham);
 
       int y1_cikis = 1500 - y1_batma_ham;
       int x2_donme = x2_donme_ham - 1500;
@@ -123,6 +135,7 @@ void loop() {
 
       if (acilDurum || yazilimsalKilit) {
         sistemiKilitle();
+        Serial.println(" -> DURUM: SISTEM KILITLI (Motorlar 1500)");
       } else {
         onsag.writeMicroseconds(onsagPWM); onsol.writeMicroseconds(onsolPWM);
         arsag.writeMicroseconds(arsagPWM); arsol.writeMicroseconds(arsolPWM);

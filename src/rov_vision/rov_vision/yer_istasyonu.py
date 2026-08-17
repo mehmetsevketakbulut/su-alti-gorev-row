@@ -42,8 +42,10 @@ from datetime import datetime
 
 import cv2
 import pygame
+import serial
 
-# ------------------------------------------------------------------ AYARLARimport sys
+# ------------------------------------------------------------------ AYARLAR
+TOP_CAN_PORT = "COM5" # Bilgisayara bagli olan Deneyap CAN kartinin portu. Aygit Yoneticisinden bakin.
 
 if len(sys.argv) > 1:
     JETSON_IP = sys.argv[1]
@@ -215,6 +217,13 @@ def main():
     kayit, out = False, None
     running = True
 
+    try:
+        top_can = serial.Serial(TOP_CAN_PORT, 115200, timeout=0)
+        print(f"[CAN] {TOP_CAN_PORT} baglandi.")
+    except Exception as e:
+        top_can = None
+        print(f"[CAN HATA] {TOP_CAN_PORT} acilamadi: {e}")
+
     while running:
         for ev in pygame.event.get():
             if ev.type == pygame.QUIT or (ev.type == pygame.KEYDOWN and
@@ -233,15 +242,23 @@ def main():
                     armed = not armed
                     print("[KLAVYE] SPACE basildi -> ARMED:", armed)
                 elif ev.key == pygame.K_y:
+                    # Sadece Mıknatısı Bırak (Mod değiştirmesin)
                     if not mini_serbest:
                         magnet_evt = (magnet_evt + 1) & 0xFF
                         mini_serbest = True
+                    print("[KLAVYE] Y basildi -> MIKNATIS BIRAKILDI")
+                elif ev.key == pygame.K_m:
+                    # Mini ROV Modu + Kamera
                     mod, kamera_role = 2, 1
-                    print("[KLAVYE] Y basildi -> MINI ROV AYRILDI")
+                    print("[KLAVYE] M basildi -> MINI ROV MODUNA GECILDI")
                 elif ev.key == pygame.K_1:
                     mod, kamera_role = 0, 0
                 elif ev.key == pygame.K_2:
                     mod = 1
+                elif ev.key == pygame.K_l:
+                    # Mini ROV Işığını aç/kapat (CAN Bus Testi için)
+                    isik_mini = 100 if isik_mini == 0 else 0
+                    print("[KLAVYE] L basildi -> MINI ISIK:", isik_mini)
 
             elif ev.type == pygame.JOYBUTTONDOWN:
                 b = ev.button
@@ -328,11 +345,29 @@ def main():
 
         if not armed:
             fwd = strafe = dive = yaw = 0
+            
+        # YENI MIMARI: Mini ROV Yonlendirmesi (Topside CAN)
+        fwd_jetson, strafe_jetson, dive_jetson, yaw_jetson = fwd, strafe, dive, yaw
+        fwd_mini, strafe_mini, dive_mini, yaw_mini = 0, 0, 0, 0
+        fs_mini = 0 if armed else 1
+        
+        if mod == 2:
+            # Mini ROV Modu: İtkiler Jetson'a 0 gider, PC'deki CAN modülüne gider
+            fwd_jetson = strafe_jetson = dive_jetson = yaw_jetson = 0
+            fwd_mini, strafe_mini, dive_mini, yaw_mini = fwd, strafe, dive, yaw
+            
+        if 'top_can' in globals() and top_can is not None:
+            try:
+                # Format: M,fwd,strafe,dive,yaw,fs_mini
+                msg = f"M,{fwd_mini},{strafe_mini},{dive_mini},{yaw_mini},{fs_mini}\n"
+                top_can.write(msg.encode('utf-8'))
+            except Exception as e:
+                print(f"[CAN HATA] Yazilamadi: {e}")
 
         seq += 1
         paket = {"seq": seq, "t": time.time(), "mod": mod,
                  "armed": 1 if armed else 0,
-                 "fwd": fwd, "strafe": strafe, "dive": dive, "yaw": yaw,
+                 "fwd": fwd_jetson, "strafe": strafe_jetson, "dive": dive_jetson, "yaw": yaw_jetson,
                  "kamera_role": kamera_role, "kamera_tilt": tilt,
                  "magnet_evt": magnet_evt,       # HER PAKETTE gonderilir
                  "isik_ana": isik_ana, "isik_mini": isik_mini}
@@ -377,17 +412,47 @@ def main():
         my = arm_r.bottom + 12
         pygame.draw.rect(screen, C_PANEL, (40, my, vw, H - my - 40), border_radius=12)
         pygame.draw.rect(screen, C_CYAN, (40, my, vw, H - my - 40), 2, border_radius=12)
-        screen.blit(f_hd.render("ANA ROV GERCEK ESC CIKISLARI (firmware telemetrisi)",
-                                True, C_YELLOW), (65, my + 12))
-        adlar = ["M1 On Sag", "M2 On Sol", "M3 Ark Sag",
-                 "M4 Ark Sol", "M5 Dik Sol", "M6 Dik Sag"]
-        for i, ad in enumerate(adlar):
-            pwm = int(t["motorlar"][i]) if i < len(t["motorlar"]) else 1500
-            yz = my + 48 + (i % 3) * 30
-            xz = 65 + (i // 3) * (vw // 2)
-            yzd = int((pwm - 1500) / 400 * 100)
-            renk = C_GREEN if abs(yzd) < 70 else C_YELLOW
-            screen.blit(f_md.render(f"{ad}: {pwm} us ({yzd:+4d}%)", True, renk), (xz, yz))
+        if mod == 2:
+            screen.blit(f_hd.render("MINI ROV HESAPLANAN CIKISLAR (PC -> Topside CAN)",
+                                    True, C_YELLOW), (65, my + 12))
+            
+            y1_cikis = -dive_mini * 5
+            x2_donme = yaw_mini * 5
+            y2_ileri = fwd_mini * 5
+            
+            x2_donme = (x2_donme / 500.0)**3 * 500.0 * 0.5
+            y2_ileri = y2_ileri * 0.7
+            
+            destek_ileri = y1_cikis * 0.25
+            destek_batma = y2_ileri * 0.15
+            
+            onsol = int(1500 + y1_cikis + destek_batma)
+            onsag = int(1500 - y1_cikis - destek_batma)
+            arsol = int(1500 + y2_ileri + destek_ileri + x2_donme)
+            arsag = int(1500 + y2_ileri + destek_ileri - x2_donme)
+            
+            adlar = ["M1 On Sol", "M2 On Sag", "M3 Ark Sol", "M4 Ark Sag"]
+            pwms = [onsol, onsag, arsol, arsag]
+            
+            for i, ad in enumerate(adlar):
+                pwm = max(1236, min(1764, pwms[i]))
+                yz = my + 48 + (i % 2) * 45
+                xz = 65 + (i // 2) * (vw // 2)
+                yzd = int((pwm - 1500) / 400 * 100)
+                renk = C_GREEN if abs(yzd) < 70 else C_YELLOW
+                screen.blit(f_md.render(f"{ad}: {pwm} us ({yzd:+4d}%)", True, renk), (xz, yz))
+        else:
+            screen.blit(f_hd.render("ANA ROV GERCEK ESC CIKISLARI (firmware telemetrisi)",
+                                    True, C_YELLOW), (65, my + 12))
+            adlar = ["M1 On Sag", "M2 On Sol", "M3 Ark Sag",
+                     "M4 Ark Sol", "M5 Dik Sol", "M6 Dik Sag"]
+            for i, ad in enumerate(adlar):
+                pwm = int(t["motorlar"][i]) if i < len(t["motorlar"]) else 1500
+                yz = my + 48 + (i % 3) * 30
+                xz = 65 + (i // 3) * (vw // 2)
+                yzd = int((pwm - 1500) / 400 * 100)
+                renk = C_GREEN if abs(yzd) < 70 else C_YELLOW
+                screen.blit(f_md.render(f"{ad}: {pwm} us ({yzd:+4d}%)", True, renk), (xz, yz))
 
         px, py = 40 + vw + 20, 40
         pw, ph = W - px - 40, H - 80

@@ -130,13 +130,31 @@ void loop() {
       if (sscanf(data.c_str(), "M,%d,%d,%d,%d,%d,%d", 
                           &v[0], &v[1], &v[2], &v[3], &v[4], &v[5]) == 6) {
         
+        sonVeriZamani = millis(); // <--- FIX FOR FAILSAFE BUG!
+        
+        // v[0]=vx(ileri), v[1]=vy(strafe/roll), v[2]=vz(batma), v[3]=yaw(donme)
+        // MiniROV'un okudugu sira:
+        // 0-1: y1_batma_ham (vz)
+        // 2-3: x1_roll_ham (vy)
+        // 4-5: x2_donme_ham (yaw)
+        // 6-7: y2_ileri_ham (vx)
+        int dive_pwm   = map(constrain(v[2], -100, 100), -100, 100, 1000, 2000);
+        int strafe_pwm = map(constrain(v[1], -100, 100), -100, 100, 1000, 2000);
+        int yaw_pwm    = map(constrain(v[3], -100, 100), -100, 100, 1000, 2000);
+        int fwd_pwm    = map(constrain(v[0], -100, 100), -100, 100, 1000, 2000);
+
         struct can_frame msg_eksen;
         msg_eksen.can_id = 0x02; msg_eksen.can_dlc = 8;
-        msg_eksen.data[0] = highByte(v[0]); msg_eksen.data[1] = lowByte(v[0]);
-        msg_eksen.data[2] = highByte(v[1]); msg_eksen.data[3] = lowByte(v[1]);
-        msg_eksen.data[4] = highByte(v[2]); msg_eksen.data[5] = lowByte(v[2]);
-        msg_eksen.data[6] = highByte(v[3]); msg_eksen.data[7] = lowByte(v[3]);
+        msg_eksen.data[0] = highByte(dive_pwm); msg_eksen.data[1] = lowByte(dive_pwm);
+        msg_eksen.data[2] = highByte(strafe_pwm); msg_eksen.data[3] = lowByte(strafe_pwm);
+        msg_eksen.data[4] = highByte(yaw_pwm); msg_eksen.data[5] = lowByte(yaw_pwm);
+        msg_eksen.data[6] = highByte(fwd_pwm); msg_eksen.data[7] = lowByte(fwd_pwm);
         mcp2515.sendMessage(&msg_eksen);
+        
+        Serial.print("[CAN GONDERILDI] Ileri="); Serial.print(fwd_pwm);
+        Serial.print(" Roll="); Serial.print(strafe_pwm);
+        Serial.print(" Yaw="); Serial.print(yaw_pwm);
+        Serial.print(" Batma="); Serial.println(dive_pwm);
         
         struct can_frame msg_kapat;
         msg_kapat.can_id = 0x04; msg_kapat.can_dlc = 1;

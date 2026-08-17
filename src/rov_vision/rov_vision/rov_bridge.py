@@ -236,6 +236,8 @@ class RovBridge(Node):
             mesaj_mini = f"M,{vx},{vy},{vz},{yaw},{fs_mini},{l_m}\n"
             try:
                 self.ser.write(mesaj_mini.encode('utf-8'))
+                self.ser.flush()
+                time.sleep(0.005) # Arduino buffer (64 byte) tasmasini engelle
             except Exception:
                 pass
         else:
@@ -283,6 +285,12 @@ class RovBridge(Node):
             satir, _, kalan = self._rx.partition(b'\n')
             self._rx = bytearray(kalan)
             s = satir.decode('utf-8', 'ignore').strip()
+            
+            # AnaROV_Arac.ino'dan gelen debug mesajlarini ROS loguna yazdir
+            if s.startswith('[CAN ALINDI]') or s.startswith(' -> '):
+                self.get_logger().info(f"[MINI ROV DEBUG] {s}")
+                continue
+                
             if not s.startswith('T,'):
                 continue
             p = s.split(',')
