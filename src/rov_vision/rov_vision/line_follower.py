@@ -517,7 +517,7 @@ class UnderwaterLineFollowerNode(Node):
             'depth_topic':    '/depth_sensor',
             # Hız sınırları
             'linear_speed':   0.15,       # m/s (su altında düşük tutulur)
-            'max_angular_z':  0.8,        # rad/s
+            'max_angular_z':  0.25,        # rad/s (Düşürüldü! Aniden çok güç çekip sistemi kapatıyordu)
             # PID - yatay hata
             'pid_kp':         0.003,
             'pid_ki':         0.0001,
