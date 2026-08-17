@@ -134,8 +134,8 @@ def test_open_port(port, baud=115200):
 def test_send_data(ser):
     print_header("TEST 3: Veri Gönderme (Nötr Paket)")
     
-    # Nötr motor değerleri (tüm motorlar durgun)
-    paket = "A,0,0,0,0,0,0,0,150,25\n"
+    # Nötr motor değerleri (tüm motorlar durgun, ışık 0)
+    paket = "A,0,0,0,0,0,0,0,0,0,0,0\n"
     
     print_info(f"Gönderilen paket: {repr(paket)}")
     print_info(f"Paket boyutu   : {len(paket)} byte")
@@ -162,7 +162,7 @@ def test_send_data(ser):
 def test_continuous_send(ser, duration=5):
     print_header(f"TEST 4: Sürekli Gönderim ({duration}s, 20Hz)")
     
-    paket = "A,0,0,0,0,0,0,0,150,25\n"
+    paket = "A,0,0,0,0,0,0,0,0,0,0,0\n"
     count = 0
     start = time.time()
     
@@ -216,13 +216,13 @@ def test_motors(ser, power=20, duration_per_motor=2.0):
         print_warn("İptal edildi.")
         return
     
-    nötr = "A,0,0,0,0,0,0,0,150,25\n"
+    nötr = "A,0,0,0,0,0,0,0,0,0,0,0\n"
     
     for i in range(6):
         motor_vals = [0, 0, 0, 0, 0, 0]
         motor_vals[i] = power
         
-        paket = f"A,{motor_vals[0]},{motor_vals[1]},{motor_vals[2]},{motor_vals[3]},{motor_vals[4]},{motor_vals[5]},0,150,25\n"
+        paket = f"A,{motor_vals[0]},{motor_vals[1]},{motor_vals[2]},{motor_vals[3]},{motor_vals[4]},{motor_vals[5]},0,0,0,0,0\n"
         
         print(f"\n  🔄 {motor_names[i]} — %{power} güç ({duration_per_motor}s)")
         print(f"     Paket: {paket.strip()}")
@@ -256,14 +256,14 @@ def test_kill_switch(ser):
     print_header("TEST 6: Kill Switch (btn_kapat) Testi")
     
     # Önce nötr paketler gönder
-    nötr = "A,0,0,0,0,0,0,0,150,25\n"
+    nötr = "A,0,0,0,0,0,0,0,0,0,0,0\n"
     for _ in range(20):
         ser.write(nötr.encode('utf-8'))
         time.sleep(0.05)
     print_ok("Nötr paketler gönderildi (1s)")
     
     # Kill komutu gönder
-    kill = "A,0,0,0,0,0,0,1,150,25\n"
+    kill = "A,0,0,0,0,0,0,1,0,0,0,0\n"
     print_info(f"Kill paketi gönderiliyor: {kill.strip()}")
     for _ in range(10):
         ser.write(kill.encode('utf-8'))
@@ -357,7 +357,7 @@ def main():
         print(f"\n{C.WARN}Kullanıcı durdurdu.{C.END}")
         # Nötr paket gönder
         try:
-            nötr = "A,0,0,0,0,0,0,0,150,25\n"
+            nötr = "A,0,0,0,0,0,0,0,0,0,0,0\n"
             for _ in range(10):
                 ser.write(nötr.encode('utf-8'))
                 time.sleep(0.05)

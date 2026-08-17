@@ -443,12 +443,14 @@ class AutonomousDriverNode(Node):
         """
         AnaROV_vehicle.ino firmware'ine motor komutu gönderir.
         
-        Firmware format: "A,m1,m2,m3,m4,m5,m6,btn,kp,kd\n"
+        Firmware format: "A,m1,m2,m3,m4,m5,m6,btn,role,miknatis,aydinlatma,roll_input\n"
         - m1..m6: Motor yüzdeleri (-100 ile +100 arası)
         - btn: Kill switch (0=normal, 1=acil durdurma)
-        - kp, kd: 150, 25 (Deneyap'ın beklentisi)
+        - role, miknatis: 0, 0 (Röle ve Mıknatıs kapalı)
+        - aydinlatma: 50 (Görüntü işleme için Işık %50 açık)
+        - roll_input: 0 (Kullanılmıyor)
         """
-        paket = f"A,{m1},{m2},{m3},{m4},{m5},{m6},{btn},150,25\n"
+        paket = f"A,{m1},{m2},{m3},{m4},{m5},{m6},{btn},0,0,50,0\n"
 
         if self.ser and self.ser.is_open:
             try:
