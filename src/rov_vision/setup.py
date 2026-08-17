@@ -32,7 +32,8 @@ setup(
             'autonomous_driver = rov_vision.autonomous_driver:main',
             'mission_orbit = rov_vision.mission_orbit:main',
             'video_mission = rov_vision.video_mission:main',
-
+	    'rov_bridge = rov_vision.rov_bridge:main',
+            'ground_link = rov_vision.ground_link:main',
             'distance_publisher = rov_vision.distance_publisher:main',
             'test_serial = rov_vision.test_serial_jetson:main',
             'pressure_publisher = rov_vision.pressure_publisher:main',

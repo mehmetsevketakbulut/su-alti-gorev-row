@@ -1,6 +1,14 @@
 [console_scripts]
 autonomous_driver = rov_vision.autonomous_driver:main
+distance_publisher = rov_vision.distance_publisher:main
+ground_link = rov_vision.ground_link:main
+imu_publisher = rov_vision.imu_publisher:main
 line_follower = rov_vision.line_follower:main
 mission_orbit = rov_vision.mission_orbit:main
+pressure_publisher = rov_vision.pressure_publisher:main
+ros2_video_streamer = rov_vision.ros2_video_streamer:main
+rov_bridge = rov_vision.rov_bridge:main
+test_serial = rov_vision.test_serial_jetson:main
+video_mission = rov_vision.video_mission:main
 video_publisher = rov_vision.video_publisher:main
 

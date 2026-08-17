@@ -1,0 +1,29 @@
+[1.167s] Invoking command in '/home/akintay/Desktop/su-alti-gorev-row/src/rov_vision': PYTHONPATH=/home/akintay/Desktop/su-alti-gorev-row/build/rov_vision/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/akintay/Desktop/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/rov_vision build --build-base /home/akintay/Desktop/su-alti-gorev-row/build/rov_vision/build install --record /home/akintay/Desktop/su-alti-gorev-row/build/rov_vision/install.log --single-version-externally-managed install_data
+[1.622s] running egg_info
+[1.623s] writing ../../build/rov_vision/rov_vision.egg-info/PKG-INFO
+[1.623s] writing dependency_links to ../../build/rov_vision/rov_vision.egg-info/dependency_links.txt
+[1.623s] writing entry points to ../../build/rov_vision/rov_vision.egg-info/entry_points.txt
+[1.624s] writing requirements to ../../build/rov_vision/rov_vision.egg-info/requires.txt
+[1.624s] writing top-level names to ../../build/rov_vision/rov_vision.egg-info/top_level.txt
+[1.627s] reading manifest file '../../build/rov_vision/rov_vision.egg-info/SOURCES.txt'
+[1.629s] writing manifest file '../../build/rov_vision/rov_vision.egg-info/SOURCES.txt'
+[1.629s] running build
+[1.629s] running build_py
+[1.629s] copying rov_vision/video_mission.py -> /home/akintay/Desktop/su-alti-gorev-row/build/rov_vision/build/lib/rov_vision
+[1.631s] running install
+[1.631s] running install_lib
+[1.633s] copying /home/akintay/Desktop/su-alti-gorev-row/build/rov_vision/build/lib/rov_vision/video_mission.py -> /home/akintay/Desktop/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision
+[1.634s] byte-compiling /home/akintay/Desktop/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision/video_mission.py to video_mission.cpython-310.pyc
+[1.639s] running install_data
+[1.640s] running install_egg_info
+[1.643s] removing '/home/akintay/Desktop/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision-0.0.0-py3.10.egg-info' (and everything under it)
+[1.643s] Copying ../../build/rov_vision/rov_vision.egg-info to /home/akintay/Desktop/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages/rov_vision-0.0.0-py3.10.egg-info
+[1.645s] running install_scripts
+[1.682s] Installing autonomous_driver script to /home/akintay/Desktop/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+[1.683s] Installing distance_publisher script to /home/akintay/Desktop/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+[1.683s] Installing line_follower script to /home/akintay/Desktop/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+[1.683s] Installing mission_orbit script to /home/akintay/Desktop/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+[1.684s] Installing video_mission script to /home/akintay/Desktop/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+[1.684s] Installing video_publisher script to /home/akintay/Desktop/su-alti-gorev-row/install/rov_vision/lib/rov_vision
+[1.685s] writing list of installed files to '/home/akintay/Desktop/su-alti-gorev-row/build/rov_vision/install.log'
+[1.749s] Invoked command in '/home/akintay/Desktop/su-alti-gorev-row/src/rov_vision' returned '0': PYTHONPATH=/home/akintay/Desktop/su-alti-gorev-row/build/rov_vision/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/akintay/Desktop/su-alti-gorev-row/install/rov_vision/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/rov_vision build --build-base /home/akintay/Desktop/su-alti-gorev-row/build/rov_vision/build install --record /home/akintay/Desktop/su-alti-gorev-row/build/rov_vision/install.log --single-version-externally-managed install_data
