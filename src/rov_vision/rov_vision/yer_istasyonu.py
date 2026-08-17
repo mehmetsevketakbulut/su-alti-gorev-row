@@ -43,10 +43,19 @@ from datetime import datetime
 import cv2
 import pygame
 
-# ------------------------------------------------------------------ AYARLAR
-JETSON_IP = "192.168.1.10"
+# ------------------------------------------------------------------ AYARLARimport sys
+
+if len(sys.argv) > 1:
+    JETSON_IP = sys.argv[1]
+else:
+    JETSON_IP = input("Jetson'in IP Adresini Girin (ornegin 192.168.1.5): ").strip()
+    if not JETSON_IP:
+        JETSON_IP = "192.168.1.10"
+
 CMD_PORT = 5005
 TELEM_PORT = 5006
+print(f"Baglanilacak Jetson IP: {JETSON_IP}")
+
 STREAM_URL = f"http://{JETSON_IP}:5000/video"
 GONDERIM_HZ = 50
 
@@ -212,12 +221,28 @@ def main():
                                           ev.key == pygame.K_ESCAPE):
                 running = False
             elif ev.type == pygame.JOYDEVICEREMOVED:
-                joy, armed = None, False
-                print("[JOYSTICK] Cikarildi -> DISARM")
+                # PS4 controller causes phantom disconnects, do NOT disarm automatically
+                joy = None
+                print("[JOYSTICK] Cikarildi (Phantom event ignored)")
             elif ev.type == pygame.JOYDEVICEADDED:
                 if joy is None and pygame.joystick.get_count() > 0:
                     joy = pygame.joystick.Joystick(0)
                     joy.init()
+            elif ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_SPACE:
+                    armed = not armed
+                    print("[KLAVYE] SPACE basildi -> ARMED:", armed)
+                elif ev.key == pygame.K_y:
+                    if not mini_serbest:
+                        magnet_evt = (magnet_evt + 1) & 0xFF
+                        mini_serbest = True
+                    mod, kamera_role = 2, 1
+                    print("[KLAVYE] Y basildi -> MINI ROV AYRILDI")
+                elif ev.key == pygame.K_1:
+                    mod, kamera_role = 0, 0
+                elif ev.key == pygame.K_2:
+                    mod = 1
+
             elif ev.type == pygame.JOYBUTTONDOWN:
                 b = ev.button
                 if b == BTN_START:
@@ -258,22 +283,48 @@ def main():
         fwd = strafe = dive = yaw = 0
         if joy is not None:
             try:
-                fwd = int(-joy.get_axis(AX_LY) * 100)
-                strafe = int(joy.get_axis(AX_LX) * 100)
-                dive = int(-joy.get_axis(AX_RY) * 100)
-                yaw = int(joy.get_axis(AX_RX) * 100)
-                if abs(fwd) < 6: fwd = 0
-                if abs(strafe) < 6: strafe = 0
-                if abs(dive) < 6: dive = 0
-                if abs(yaw) < 6: yaw = 0
-                hat = joy.get_hat(0)
-                if hat[1] == 1: tilt = max(0, tilt - 1)
-                elif hat[1] == -1: tilt = min(90, tilt + 1)
-                if hat[0] == 1: isik_ana = min(100, isik_ana + 2)
-                elif hat[0] == -1: isik_ana = max(0, isik_ana - 2)
-                isik_mini = isik_ana
+                raw_lx = joy.get_axis(AX_LX)
+                raw_ly = joy.get_axis(AX_LY)
+                raw_rx = joy.get_axis(AX_RX)
+                raw_ry = joy.get_axis(AX_RY)
+                
+                fwd = int(-raw_ly * 100)
+                strafe = int(raw_lx * 100)
+                dive = int(-raw_ry * 100)
+                yaw = int(raw_rx * 100)
+                
+                # Ekrana basarak PS4 trigger (L2/R2) sorunu var mi gormek icin
+                if seq % 20 == 0:
+                    print(f"JOY_DEBUG -> L_Y(Fwd):{fwd}  R_Y(Dive):{dive}  L_X(Strafe):{strafe}  R_X(Yaw):{yaw}")
+
+                if abs(fwd) < 15: fwd = 0
+                if abs(strafe) < 15: strafe = 0
+                if abs(dive) < 15: dive = 0
+                if abs(yaw) < 15: yaw = 0
+                try:
+                    if joy.get_numhats() > 0:
+                        hat = joy.get_hat(0)
+                        if hat[1] == 1: tilt = max(0, tilt - 1)
+                        elif hat[1] == -1: tilt = min(90, tilt + 1)
+                        if hat[0] == 1: isik_ana = min(100, isik_ana + 2)
+                        elif hat[0] == -1: isik_ana = max(0, isik_ana - 2)
+                        isik_mini = isik_ana
+                except pygame.error:
+                    pass
             except pygame.error:
-                joy, armed = None, False
+                pass  # Sadece sessizce atla, terminali bogmasin
+                
+        # --- KLAVYE SURUS DESTEGI ---
+        keys = pygame.key.get_pressed()
+        # Brownout (kapanma) olmamasi icin test asamasinda gucu %20'ye cektik.
+        if keys[pygame.K_w]: fwd = 20
+        elif keys[pygame.K_s]: fwd = -20
+        if keys[pygame.K_a]: strafe = -20
+        elif keys[pygame.K_d]: strafe = 20
+        if keys[pygame.K_LSHIFT]: dive = 20
+        elif keys[pygame.K_LCTRL]: dive = -20
+        if keys[pygame.K_q]: yaw = -20
+        elif keys[pygame.K_e]: yaw = 20
 
         if not armed:
             fwd = strafe = dive = yaw = 0

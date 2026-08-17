@@ -216,10 +216,10 @@ class RovBridge(Node):
 
         target, fx, fy, fz, fyaw, armed, tilt = self._sec()
 
-        vx = kirp(fx * 100.0)
-        vy = kirp(fy * 100.0)
-        vz = kirp(fz * 100.0)
-        yaw = kirp(fyaw * 100.0)
+        vx = kirp(int(fx * 100.0), -100, 100)
+        vy = kirp(int(fy * 100.0), -100, 100)
+        vz = kirp(int(fz * 100.0), -100, 100)
+        yaw = kirp(int(fyaw * 100.0), -100, 100)
 
         with self._lock:
             mod = self.mode
@@ -228,21 +228,43 @@ class RovBridge(Node):
             l_a = self.isik_ana if armed else 0
             l_m = self.isik_mini if armed else 0
             roll = kirp(int(self.roll_deg), -100, 100)
+        # Motor Mixing (Vectored 6-Thruster)
+        if target == 2:
+            # MINI ROV MODU
+            m1 = m2 = m3 = m4 = m5 = m6 = 0 # Ana ROV dursun
+            fs_mini = 0 if armed else 1
+            mesaj_mini = f"M,{vx},{vy},{vz},{yaw},{fs_mini},{l_m}\n"
+            try:
+                self.ser.write(mesaj_mini.encode('utf-8'))
+            except Exception:
+                pass
+        else:
+            # ANA ROV MODU
+            m1 = int((fx - fy - fyaw) * 100)
+            m2 = int((fx + fy + fyaw) * 100)
+            m3 = int((fx + fy - fyaw) * 100)
+            m4 = int((fx - fy + fyaw) * 100)
+            m5 = int(fz * 100)
+            m6 = int(fz * 100)
 
-        flags = (0x01 if role else 0x00) | (0x02 if armed else 0x00)
+        # Sinirla
+        m1 = kirp(m1, -100, 100)
+        m2 = kirp(m2, -100, 100)
+        m3 = kirp(m3, -100, 100)
+        m4 = kirp(m4, -100, 100)
+        m5 = kirp(m5, -100, 100)
+        m6 = kirp(m6, -100, 100)
+        
+        if not armed:
+            m1 = m2 = m3 = m4 = m5 = m6 = 0
 
-        self.seq = (self.seq + 1) & 0xFF
-        govde = struct.pack(
-            '<BBBBbbbbBBBBBb',
-            PAYLOAD_LEN, self.seq, target & 0xFF, mod & 0xFF,
-            vx, vy, vz, yaw,
-            tilt & 0xFF, flags, mag & 0xFF,
-            l_a & 0xFF, l_m & 0xFF, roll,
-        )
-        paket = bytes([SYNC1, SYNC2]) + govde + bytes([crc8(govde)])
+        failsafe_flag = 0 if armed else 1
+        
+        # A,m1,m2,m3,m4,m5,m6,failsafe,role,miknatis,isik,roll,tilt
+        mesaj = f"A,{m1},{m2},{m3},{m4},{m5},{m6},{failsafe_flag},{role},{mag},{l_a},{roll},{tilt}\n"
 
         try:
-            self.ser.write(paket)
+            self.ser.write(mesaj.encode('utf-8'))
         except Exception as e:
             self.get_logger().warn(f'Seri yazma hatasi: {e}', throttle_duration_sec=2.0)
 
