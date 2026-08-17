@@ -1,7 +1,6 @@
 #include <ESP32Servo.h>
 #include <mcp2515.h>
 #include <SPI.h>
-#include <PID_v1.h>
 
 // ------------------- KULLANICININ VERDIGI YENI PINLER -------------------
 #define SPI_CS D4       
@@ -25,9 +24,9 @@ MCP2515 mcp2515(SPI_CS);
 Servo esc_m1, esc_m2, esc_m3, esc_m4, esc_m5, esc_m6;
 Servo tiltServo;
 
-double roll_input, roll_output, roll_setpoint = 0.0; 
-double Kp = 1.5, Ki = 0.0, Kd = 0.25; 
-PID rollPID(&roll_input, &roll_output, &roll_setpoint, Kp, Ki, Kd, DIRECT);
+double roll_input = 0.0; 
+double roll_output = 0.0;
+double Kp = 1.5; // Basit P kontrolcu sabiti
 
 int base_pwm[6] = {1500, 1500, 1500, 1500, 1500, 1500};
 int mevcut_servo = 45;
@@ -87,9 +86,6 @@ void setup() {
   mcp2515.reset();
   mcp2515.setBitrate(CAN_125KBPS, MCP_8MHZ);
   mcp2515.setNormalMode();
-
-  rollPID.SetMode(AUTOMATIC);
-  rollPID.SetOutputLimits(-200, 200); 
 }
 
 void loop() {
@@ -159,7 +155,9 @@ void loop() {
     failsafe_aktif = true;
     motorlariDurdur(); 
   } else {
-    rollPID.Compute(); 
+    // Basit P kontrolcu (PID_v1 kutuphanesi olmadan)
+    roll_output = constrain(roll_input * Kp, -200, 200); 
+    
     esc_m1.writeMicroseconds(base_pwm[0]); esc_m2.writeMicroseconds(base_pwm[1]);
     esc_m3.writeMicroseconds(base_pwm[2]); esc_m4.writeMicroseconds(base_pwm[3]);
     esc_m5.writeMicroseconds(constrain(base_pwm[4] - roll_output, 1000, 2000));
