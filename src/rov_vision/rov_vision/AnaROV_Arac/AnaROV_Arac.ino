@@ -180,5 +180,3 @@ void loop() {
       Serial.println(",0");
   }
 }
- }
-}
