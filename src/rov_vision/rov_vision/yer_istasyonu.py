@@ -45,7 +45,7 @@ import pygame
 import serial
 
 # ------------------------------------------------------------------ AYARLAR
-TOP_CAN_PORT = "COM5" # Bilgisayara bagli olan Deneyap CAN kartinin portu. Aygit Yoneticisinden bakin.
+TOP_CAN_PORT = "COM15" # Bilgisayara bagli olan Deneyap CAN kartinin portu. Aygit Yoneticisinden bakin.
 
 if len(sys.argv) > 1:
     JETSON_IP = sys.argv[1]
@@ -361,8 +361,14 @@ def main():
                 # Format: M,fwd,strafe,dive,yaw,fs_mini
                 msg = f"M,{fwd_mini},{strafe_mini},{dive_mini},{yaw_mini},{fs_mini}\n"
                 top_can.write(msg.encode('utf-8'))
+                
+                # Topside CAN'den gelen debug mesajlarini oku ve ekrana bas
+                while top_can.in_waiting:
+                    can_line = top_can.readline().decode('utf-8', 'ignore').strip()
+                    if can_line:
+                        print(can_line)
             except Exception as e:
-                print(f"[CAN HATA] Yazilamadi: {e}")
+                print(f"[CAN HATA] Islem basarisiz: {e}")
 
         seq += 1
         paket = {"seq": seq, "t": time.time(), "mod": mod,
@@ -479,20 +485,24 @@ def main():
         y += 105
 
         screen.blit(f_hd.render("SENSORLER", True, C_TEXT), (px + 22, y))
-        screen.blit(f_md.render(f"Derinlik : {t['derinlik_cm']:.1f} cm", True, C_TEXT),
+        screen.blit(f_md.render(f"Derinlik : {t.get('derinlik_cm', 0):.1f} cm", True, C_TEXT),
                     (px + 22, y + 26))
-        screen.blit(f_md.render(f"Mesafe   : {t['mesafe_cm']:.1f} cm", True, C_TEXT),
+        screen.blit(f_md.render(f"Basinc   : {t.get('basinc_mbar', 0):.2f} mBar", True, C_TEXT),
                     (px + 22, y + 48))
-        screen.blit(f_md.render(f"Roll     : {t['roll']:.1f} d", True, C_TEXT),
+        screen.blit(f_md.render(f"Sicaklik : {t.get('sicaklik_c', 0):.1f} °C", True, C_TEXT),
                     (px + 22, y + 70))
-        screen.blit(f_md.render(f"Pitch    : {t['pitch']:.1f} d", True, C_TEXT),
+        screen.blit(f_md.render(f"Mesafe   : {t.get('mesafe_cm', 0):.1f} cm", True, C_TEXT),
                     (px + 22, y + 92))
-        y += 130
+        screen.blit(f_md.render(f"Roll     : {t.get('roll', 0):.1f} d", True, C_TEXT),
+                    (px + 22, y + 114))
+        screen.blit(f_md.render(f"Pitch    : {t.get('pitch', 0):.1f} d", True, C_TEXT),
+                    (px + 22, y + 136))
+        y += 160
 
         screen.blit(f_hd.render("GORUNTU / ISIK", True, C_TEXT), (px + 22, y))
         screen.blit(f_md.render(f"Kamera : {'MINI ROV' if kamera_role else 'ANA ROV'}",
                                 True, C_GREEN), (px + 22, y + 26))
-        screen.blit(f_md.render(f"Tilt   : {tilt} d  (gercek {int(t['servo'])} d)",
+        screen.blit(f_md.render(f"Tilt   : {tilt} d  (gercek {int(t.get('servo', 0))} d)",
                                 True, C_YELLOW), (px + 22, y + 48))
         screen.blit(f_md.render(f"Isik   : %{isik_ana}", True, C_TEXT), (px + 22, y + 70))
         if kayit:

@@ -58,11 +58,15 @@ class GroundLink(Node):
         self.telem = [0.0] * 11
         self.depth_cm = 0.0
         self.dist_cm = 0.0
+        self.pressure_mbar = 1013.25
+        self.temperature_c = 25.0
         self.roll = self.pitch = 0.0
 
         self.create_subscription(Float32MultiArray, '/rov/telemetry',
                                  self._cb_telem, 10)
         self.create_subscription(Float32, '/depth_sensor', self._cb_depth, qos)
+        self.create_subscription(Float32, '/pressure_sensor', self._cb_press, qos)
+        self.create_subscription(Float32, '/temperature_sensor', self._cb_temp, qos)
         self.create_subscription(Float32, '/distance_sensor', self._cb_dist, qos)
         self.create_subscription(Imu, '/imu/data', self._cb_imu, qos)
 
@@ -86,6 +90,12 @@ class GroundLink(Node):
 
     def _cb_depth(self, msg):
         self.depth_cm = float(msg.data)
+
+    def _cb_press(self, msg):
+        self.pressure_mbar = float(msg.data)
+        
+    def _cb_temp(self, msg):
+        self.temperature_c = float(msg.data)
 
     def _cb_dist(self, msg):
         self.dist_cm = float(msg.data)
@@ -152,10 +162,12 @@ class GroundLink(Node):
             'magnet': int(t[8]),
             'can_err': int(t[9]),
             'uart_ok': int(t[10]),
-            'derinlik_cm': round(self.depth_cm, 1),
-            'mesafe_cm': round(self.dist_cm, 1),
-            'roll': round(self.roll, 1),
-            'pitch': round(self.pitch, 1),
+            'derinlik_cm': self.depth_cm,
+            'basinc_mbar': self.pressure_mbar,
+            'sicaklik_c': self.temperature_c,
+            'mesafe_cm': self.dist_cm,
+            'roll': self.roll,
+            'pitch': self.pitch,
             't': time.time(),
         }
         try:

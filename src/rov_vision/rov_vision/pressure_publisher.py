@@ -52,6 +52,10 @@ class PressurePublisher(Node):
         # Zamanlayıcıyı oluştur (10 Hz için 0.1 saniye)
         timer_period = 1.0 / self.publish_rate_hz
         self.timer = self.create_timer(timer_period, self.timer_callback)
+        
+        # Ek Topic'ler: Basinc (mBar) ve Sicaklik (C)
+        self.pub_press = self.create_publisher(Float32, '/pressure_sensor', 10)
+        self.pub_temp = self.create_publisher(Float32, '/temperature_sensor', 10)
 
     def timer_callback(self):
         if not self.sensor_initialized:
@@ -64,13 +68,20 @@ class PressurePublisher(Node):
                 # Derinliği metre cinsinden al ve santimetreye çevir
                 depth_m = self.sensor.depth()
                 depth_cm = depth_m * 100.0
+                pressure_mbar = self.sensor.pressure()
+                temp_c = self.sensor.temperature()
 
-                # Mesajı oluştur ve yayınla
-                msg = Float32()
-                msg.data = float(depth_cm)
-                self.publisher_.publish(msg)
+                # Mesajları oluştur ve yayınla
+                msg_depth = Float32(); msg_depth.data = float(depth_cm)
+                self.publisher_.publish(msg_depth)
                 
-                self.get_logger().debug(f"Yayınlanan derinlik: {depth_cm:.2f} cm")
+                msg_press = Float32(); msg_press.data = float(pressure_mbar)
+                self.pub_press.publish(msg_press)
+                
+                msg_temp = Float32(); msg_temp.data = float(temp_c)
+                self.pub_temp.publish(msg_temp)
+                
+                self.get_logger().debug(f"Derinlik: {depth_cm:.2f}cm | Basinc: {pressure_mbar:.2f}mBar | Sicaklik: {temp_c:.2f}C")
             else:
                 self.get_logger().error("Sensörden veri okunamadı!")
         except Exception as e:
