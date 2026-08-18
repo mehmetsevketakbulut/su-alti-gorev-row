@@ -55,8 +55,8 @@ def generate_launch_description():
                               description='Yer istasyonu PC IP adresi'),
         DeclareLaunchArgument('serial_port', default_value='/dev/ttyUSB0',
                               description='Ana ROV Deneyap USB portu'),
-        DeclareLaunchArgument('dyp_port', default_value='/dev/ttyUSB1',
-                              description='DYP mesafe sensoru portu'),
+        DeclareLaunchArgument('dyp_port', default_value='/dev/ttyTHS1',
+                              description='DYP mesafe sensoru portu (Pin 8-10)'),
         DeclareLaunchArgument('imu_bus', default_value='7',
                               description='BNO085 I2C bus numarasi'),
         DeclareLaunchArgument('stream_topic', default_value='/camera/image_raw',
@@ -103,7 +103,7 @@ def generate_launch_description():
 
         Node(package='rov_vision', executable='pressure_publisher',
              name='pressure_publisher', output='screen',
-             parameters=[{'i2c_bus': 0,
+             parameters=[{'i2c_bus': 1,
                           'fluid_density': 'freshwater',
                           'publish_rate_hz': 10.0}]),
 
