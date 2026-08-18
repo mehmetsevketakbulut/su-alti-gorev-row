@@ -29,8 +29,8 @@ PARAMETRE DUZELTMELERI (dosya duzenlemeden, buradan geciliyor)
       Varsayilan 1'di ama hardware_test.py ve imu_debug.py dosyalariniz
       BNO085'i I2C-7'de buluyor. Varsayilanla node sessizce bos veri yayinlar.
 
-  distance_publisher serial_port: 'COM9' -> '/dev/ttyTHS1'
-      Varsayilan bir Windows port adiydi, simdi Jetson donanimsal UART (Pin 8-10) olarak guncellendi.
+  distance_publisher serial_port: 'COM9' -> '/dev/ttyUSB1'
+      Varsayilan bir Windows port adiydi, Jetson'da ASLA acilmaz.
 
   pressure_publisher DOSYADA tek satir degisiklik gerekiyor (asagiya bakin).
 =============================================================================
@@ -55,8 +55,8 @@ def generate_launch_description():
                               description='Yer istasyonu PC IP adresi'),
         DeclareLaunchArgument('serial_port', default_value='/dev/ttyUSB0',
                               description='Ana ROV Deneyap USB portu'),
-        DeclareLaunchArgument('dyp_port', default_value='/dev/ttyTHS1',
-                              description='DYP mesafe sensoru portu (Pin 8-10)'),
+        DeclareLaunchArgument('dyp_port', default_value='/dev/ttyUSB1',
+                              description='DYP mesafe sensoru portu'),
         DeclareLaunchArgument('imu_bus', default_value='7',
                               description='BNO085 I2C bus numarasi'),
         DeclareLaunchArgument('stream_topic', default_value='/camera/image_raw',
@@ -103,7 +103,7 @@ def generate_launch_description():
 
         Node(package='rov_vision', executable='pressure_publisher',
              name='pressure_publisher', output='screen',
-             parameters=[{'i2c_bus': 1,
+             parameters=[{'i2c_bus': 0,
                           'fluid_density': 'freshwater',
                           'publish_rate_hz': 10.0}]),
 
