@@ -16,10 +16,14 @@ class PressurePublisher(Node):
         self.declare_parameter('fluid_density', 'saltwater')
 
         # Parametre değerlerini al
-        self.i2c_bus = self.get_parameter('i2c_bus').value
+        raw_bus = self.get_parameter('i2c_bus').value
+        self.i2c_bus = int(raw_bus)  # Kesinlikle integer'a cevir
         self.publish_topic = self.get_parameter('publish_topic').value
         self.publish_rate_hz = self.get_parameter('publish_rate_hz').value
         self.fluid_density_str = self.get_parameter('fluid_density').value
+
+        self.get_logger().info(f"---- MS5837 BASLATILIYOR ----")
+        self.get_logger().info(f"Hedef I2C Bus: {self.i2c_bus} (Tipi: {type(self.i2c_bus)})")
 
         # Publisher'ı oluştur
         self.publisher_ = self.create_publisher(Float32, self.publish_topic, 10)
@@ -33,14 +37,16 @@ class PressurePublisher(Node):
                 if self.sensor.init():
                     self.sensor_initialized = True
                     break
+                else:
+                    self.get_logger().warn(f"MS5837 init() False dondu (Deneme {attempt+1})")
             except Exception as e:
-                self.get_logger().warn(f"MS5837 başlatma denemesi {attempt+1}/5 başarısız: {e}")
+                self.get_logger().warn(f"MS5837 başlatma denemesi {attempt+1}/5 başarısız (Exception): {e}")
             time.sleep(0.5)
 
         if not self.sensor_initialized:
             self.get_logger().error("MS5837 sensörü başlatılamadı! Lütfen I2C bağlantısını kontrol edin.")
         else:
-            self.get_logger().info("MS5837 sensörü başarıyla başlatıldı.")
+            self.get_logger().info(f"MS5837 sensörü I2C-{self.i2c_bus} üzerinde başarıyla başlatıldı.")
             # Akışkan yoğunluğunu ayarla
             if self.fluid_density_str.lower() == 'saltwater':
                 self.sensor.setFluidDensity(ms5837.DENSITY_SALTWATER)
@@ -83,9 +89,10 @@ class PressurePublisher(Node):
                 
                 self.get_logger().debug(f"Derinlik: {depth_cm:.2f}cm | Basinc: {pressure_mbar:.2f}mBar | Sicaklik: {temp_c:.2f}C")
             else:
-                self.get_logger().error("Sensörden veri okunamadı!")
+                self.get_logger().error("Sensörden veri okunamadı!", throttle_duration_sec=2.0)
         except Exception as e:
-            self.get_logger().error(f"Veri okunurken hata oluştu: {str(e)}")
+            # I2C hatlarinda (ozellikle Jetson'da) anlik Errno 121 olmasi normaldir. Node'u cokertmesin.
+            self.get_logger().warn(f"I2C Anlik Okuma Hatasi (Gormezden gelinebilir): {str(e)}", throttle_duration_sec=2.0)
 
 
 def main(args=None):
