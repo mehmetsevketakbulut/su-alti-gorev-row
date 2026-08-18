@@ -96,6 +96,7 @@ class RovBridge(Node):
         self.isik_ana = 0
         self.isik_mini = 0
         self.roll_deg = 0.0
+        self.kill_switch = 0
         self.seq = 0
 
         self._son_manual = 0.0
@@ -175,6 +176,7 @@ class RovBridge(Node):
             if len(d) > 2: self.magnet_evt = int(d[2]) & 0xFF
             if len(d) > 3: self.isik_ana = kirp(d[3], 0, 100)
             if len(d) > 4: self.isik_mini = kirp(d[4], 0, 100)
+            if len(d) > 5: self.kill_switch = 1 if d[5] else 0
 
     def _cb_imu(self, msg):
         q = msg.orientation
@@ -228,6 +230,7 @@ class RovBridge(Node):
             l_a = self.isik_ana if armed else 0
             l_m = self.isik_mini if armed else 0
             roll = kirp(int(self.roll_deg), -100, 100)
+            k_sw = self.kill_switch
         # Motor Mixing (Vectored 6-Thruster)
         if target == 2:
             # MINI ROV MODU
@@ -262,8 +265,8 @@ class RovBridge(Node):
 
         failsafe_flag = 0 if armed else 1
         
-        # A,m1,m2,m3,m4,m5,m6,failsafe,role,miknatis,isik,roll,tilt
-        mesaj = f"A,{m1},{m2},{m3},{m4},{m5},{m6},{failsafe_flag},{role},{mag},{l_a},{roll},{tilt}\n"
+        # A,m1,m2,m3,m4,m5,m6,failsafe,role,miknatis,isik,roll,tilt,killswitch
+        mesaj = f"A,{m1},{m2},{m3},{m4},{m5},{m6},{failsafe_flag},{role},{mag},{l_a},{roll},{tilt},{k_sw}\n"
 
         try:
             self.ser.write(mesaj.encode('utf-8'))
@@ -292,14 +295,20 @@ class RovBridge(Node):
                 continue
                 
             if not s.startswith('T,'):
+                self.get_logger().info(f"[MINI ROV DEBUG] IGNORED: {s}")
                 continue
+            
             p = s.split(',')
+            self.get_logger().info(f"[MINI ROV DEBUG] PARSED {len(p)} parts: {p}")
+            
             if len(p) < 11:
+                self.get_logger().info(f"[MINI ROV DEBUG] DROPPED (len {len(p)} < 11): {p}")
                 continue
             try:
                 vals = [float(x) for x in p[1:11]]
             except ValueError:
                 continue
+                
             vals.append(1.0)                       # uart_ok
             self.telem = vals
             m = Float32MultiArray()
@@ -321,6 +330,7 @@ class RovBridge(Node):
                 self.ser.close()
             except Exception:
                 pass
+                
         super().destroy_node()
 
 

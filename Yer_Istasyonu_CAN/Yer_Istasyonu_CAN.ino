@@ -43,6 +43,12 @@ void loop() {
         dive_pwm   = map(constrain(v[2], -100, 100), -100, 100, 1000, 2000);
         yaw_pwm    = map(constrain(v[3], -100, 100), -100, 100, 1000, 2000);
         fs_mini    = v[4];
+
+        // HATA AYIKLAMA ICIN GERI BILDIRIM (Python'a gonder)
+        Serial.print("[TOPSIDE CAN] Alinan: Ileri="); Serial.print(fwd_pwm);
+        Serial.print(" Roll="); Serial.print(strafe_pwm);
+        Serial.print(" Batma="); Serial.print(dive_pwm);
+        Serial.print(" Yaw="); Serial.println(yaw_pwm);
       }
     }
   }

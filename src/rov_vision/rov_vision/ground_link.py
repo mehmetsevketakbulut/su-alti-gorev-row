@@ -149,6 +149,7 @@ class GroundLink(Node):
             int(yeni.get('magnet_evt', 0)),
             int(yeni.get('isik_ana', 0)),
             int(yeni.get('isik_mini', 0)),
+            int(yeni.get('kill_switch', 0)),
         ]
         self.pub_aux.publish(aux)
 

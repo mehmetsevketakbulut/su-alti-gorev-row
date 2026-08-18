@@ -96,18 +96,25 @@ class Kamera:
         self._ac()
         onceki = None
         while self.running:
-            if self.cap is None or not self.cap.isOpened():
-                time.sleep(0.5)
+            if not self.cap or not self.cap.isOpened():
+                time.sleep(1)
                 self._ac()
                 continue
-            ok, f = self.cap.read()
-            if not ok:
-                time.sleep(0.05)
+            try:
+                ok, f = self.cap.read()
+                if not ok:
+                    self.donuk += 1
+                    time.sleep(0.1)
+                    continue
+            except Exception:
                 self.donuk += 1
-                if self.donuk > 60:
-                    self.donuk = 0
-                    self._ac()
+                time.sleep(0.1)
                 continue
+            
+            if self.donuk > 60:
+                self.donuk = 0
+                self._ac()
+            
             # Role Ana<->Mini gecisi yapinca yakalama karti sinyal senkronunu
             # kaybeder ve HATA DONDURMEZ - son kareyi tekrar tekrar verir.
             # Pilot ekranda eski goruntuyu canli sanmasin diye tespit ediyoruz.
@@ -133,6 +140,7 @@ class Telemetri:
     def __init__(self, port):
         self.running = True
         self.lock = threading.Lock()
+        self.son_addr = "Bilinmiyor"
         self.d = {"motorlar": [1500] * 6, "servo": 45, "failsafe": 1,
                   "magnet": 0, "can_err": 0, "uart_ok": 0,
                   "derinlik_cm": 0.0, "mesafe_cm": 0.0,
@@ -147,7 +155,8 @@ class Telemetri:
     def _loop(self):
         while self.running:
             try:
-                data, _ = self.sock.recvfrom(4096)
+                data, addr = self.sock.recvfrom(4096)
+                self.son_addr = addr[0]
                 t = json.loads(data.decode())
                 with self.lock:
                     self.d.update(t)
@@ -210,6 +219,7 @@ def main():
     kamera_role = 0
     tilt = 45
     magnet_evt = 0
+    kill_switch = 0
     mini_serbest = False
     armed = False
     isik_ana = isik_mini = 0
@@ -242,11 +252,11 @@ def main():
                     armed = not armed
                     print("[KLAVYE] SPACE basildi -> ARMED:", armed)
                 elif ev.key == pygame.K_y:
-                    # Sadece Mıknatısı Bırak (Mod değiştirmesin)
-                    if not mini_serbest:
-                        magnet_evt = (magnet_evt + 1) & 0xFF
-                        mini_serbest = True
-                    print("[KLAVYE] Y basildi -> MIKNATIS BIRAKILDI")
+                    magnet_evt = 1 if magnet_evt == 0 else 0
+                    print(f"[KLAVYE] Y basildi -> MIKNATIS RÖLESİ: {magnet_evt}")
+                elif ev.key == pygame.K_k:
+                    kill_switch = 1 if kill_switch == 0 else 0
+                    print(f"[KLAVYE] K basildi -> GÜCÜ KES (KILL SWITCH): {kill_switch}")
                 elif ev.key == pygame.K_m:
                     # Mini ROV Modu + Kamera
                     mod, kamera_role = 2, 1
@@ -271,10 +281,7 @@ def main():
                 elif b == BTN_RB:
                     mod = 1
                 elif b == BTN_Y:
-                    # Ilk Y: birak + gec. Sonraki Y: sadece gec.
-                    if not mini_serbest:
-                        magnet_evt = (magnet_evt + 1) & 0xFF
-                        mini_serbest = True
+                    magnet_evt = 1 if magnet_evt == 0 else 0
                     mod, kamera_role = 2, 1
                 elif b == BTN_X:
                     kamera_role = 0 if kamera_role else 1
@@ -300,10 +307,10 @@ def main():
         fwd = strafe = dive = yaw = 0
         if joy is not None:
             try:
-                raw_lx = joy.get_axis(AX_LX)
-                raw_ly = joy.get_axis(AX_LY)
-                raw_rx = joy.get_axis(AX_RX)
-                raw_ry = joy.get_axis(AX_RY)
+                raw_lx = joy.get_axis(0)
+                raw_ly = joy.get_axis(1)
+                raw_rx = joy.get_axis(3)
+                raw_ry = joy.get_axis(4)
                 
                 fwd = int(-raw_ly * 100)
                 strafe = int(raw_lx * 100)
@@ -376,6 +383,7 @@ def main():
                  "fwd": fwd_jetson, "strafe": strafe_jetson, "dive": dive_jetson, "yaw": yaw_jetson,
                  "kamera_role": kamera_role, "kamera_tilt": tilt,
                  "magnet_evt": magnet_evt,       # HER PAKETTE gonderilir
+                 "kill_switch": kill_switch,
                  "isik_ana": isik_ana, "isik_mini": isik_mini}
         try:
             sock.sendto(json.dumps(paket).encode(), (JETSON_IP, CMD_PORT))
@@ -466,6 +474,18 @@ def main():
         pygame.draw.rect(screen, C_CYAN, (px, py, pw, ph), 2, border_radius=12)
         ttl = f_ttl.render("ALTAY ISTASYONU", True, C_CYAN)
         screen.blit(ttl, (px + (pw - ttl.get_width()) // 2, py + 18))
+        
+        # DEBUG SATIRI (gecici)
+        dbg = f"DBG->fwd={fwd_jetson} mod={mod} arm={armed} rawW={keys[pygame.K_w]}"
+        screen.blit(f_md.render(dbg, True, C_RED), (px + 10, py + 48))
+        
+        # LOG YAZMA (Teshis icin)
+        if seq % 20 == 0:
+            try:
+                with open("rov_debug_log.txt", "a") as f:
+                    f.write(f"fwd_jetson: {fwd_jetson}, Jetson: {link}, Failsafe: {t.get('failsafe', -1)}, Motorlar: {t.get('motorlar', [])}\n")
+            except Exception as e:
+                print(f"Log hatasi: {e}")
 
         y = py + 68
         screen.blit(f_hd.render("SISTEM MODU", True, C_TEXT), (px + 22, y))
@@ -475,7 +495,7 @@ def main():
         y += 70
 
         screen.blit(f_hd.render("BAGLANTI", True, C_TEXT), (px + 22, y))
-        screen.blit(f_md.render(f"Jetson    : {'OK' if link else 'KOPUK'}", True,
+        screen.blit(f_md.render(f"Jetson    : {'OK (' + tel.son_addr + ')' if link else 'KOPUK'}", True,
                                 C_GREEN if link else C_RED), (px + 22, y + 26))
         screen.blit(f_md.render(f"Failsafe  : {'AKTIF' if t['failsafe'] else 'kapali'}",
                                 True, C_RED if t['failsafe'] else C_GREEN),
@@ -483,6 +503,14 @@ def main():
         screen.blit(f_md.render(f"CAN hata  : {t['can_err']}", True,
                                 C_RED if t['can_err'] else C_TEXT), (px + 22, y + 70))
         y += 105
+        
+        if kill_switch == 1:
+            pygame.draw.rect(screen, C_RED, (px + 20, y - 5, pw - 40, 30), border_radius=5)
+            screen.blit(f_hd.render("!!! KILL SWITCH AKTIF (K) !!!", True, C_TEXT), (px + 30, y))
+            y += 40
+        else:
+            screen.blit(f_md.render("Kill Switch: KAPALI (K tusu ile ac)", True, C_TEXT), (px + 22, y))
+            y += 40
 
         screen.blit(f_hd.render("SENSORLER", True, C_TEXT), (px + 22, y))
         screen.blit(f_md.render(f"Derinlik : {t.get('derinlik_cm', 0):.1f} cm", True, C_TEXT),
