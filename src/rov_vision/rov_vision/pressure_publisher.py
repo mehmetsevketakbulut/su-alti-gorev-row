@@ -10,7 +10,7 @@ class PressurePublisher(Node):
         super().__init__('pressure_publisher')
 
         # ROS2 Parametrelerini tanımla
-        self.declare_parameter('i2c_bus', 1)
+        self.declare_parameter('i2c_bus', 0)
         self.declare_parameter('publish_topic', '/depth_sensor')
         self.declare_parameter('publish_rate_hz', 10.0)
         self.declare_parameter('fluid_density', 'saltwater')

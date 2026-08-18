@@ -7,7 +7,7 @@ except ImportError:
     exit(1)
 
 # Jetson'da I2C bus genelde 1 (veya 0, 8 olabilir, pinlere gore degisir)
-I2C_BUS = 1 
+I2C_BUS = 0 
 
 print(f"MS5837 Basınç Sensörü Testi Başlıyor (I2C Bus: {I2C_BUS})...")
 
