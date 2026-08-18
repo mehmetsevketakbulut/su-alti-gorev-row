@@ -15,7 +15,7 @@
 #define PIN_MIKNATIS D0 // Elektromiknatis MOSFET gate
 #define PIN_ROLE D1     // Kamera rolesi (LOW=Ana, HIGH=Mini)
 #define PIN_ISIK_ANA SDA// Ana ROV aydinlatma MOSFET gate (D10)
-#define PIN_SISTEM_KAPAT D13 // Guc kesme rolesi
+#define PIN_SISTEM_KAPAT D6 // Guc kesme rolesi (D6 çökme yapmaz)
 
 #define PIN_HALL_OKUMA D8 // Hall sensor (varsa)
 // ------------------------------------------------------------------------
@@ -103,12 +103,18 @@ void loop() {
     data.trim();
     
     if (data.startsWith("A,")) {
-      int v[12]; 
-      if (sscanf(data.c_str(), "A,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", 
-                          &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8], &v[9], &v[10], &v[11]) == 12) {
+      int v[13]; 
+      if (sscanf(data.c_str(), "A,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", 
+                          &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8], &v[9], &v[10], &v[11], &v[12]) == 13) {
         
         sonVeriZamani = millis();
         failsafe_aktif = (v[6] == 1);
+        
+        if (v[12] == 1) {
+            digitalWrite(PIN_SISTEM_KAPAT, HIGH);
+        } else {
+            digitalWrite(PIN_SISTEM_KAPAT, LOW);
+        }
         
         digitalWrite(PIN_ROLE, v[7] == 1 ? HIGH : LOW);
         digitalWrite(PIN_MIKNATIS, v[8] == 1 ? HIGH : LOW); 
