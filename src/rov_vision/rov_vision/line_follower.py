@@ -621,7 +621,7 @@ class UnderwaterLineFollowerNode(Node):
             angular_angle   = self.angle_pid.compute(angle_error)
 
             twist.linear.x  = self.p['linear_speed']
-            twist.angular.z = -(angular_lateral + angular_angle)
+            twist.angular.z = (angular_lateral + angular_angle)
 
             # Debug HUD
             cv2.putText(debug_frame,
@@ -635,7 +635,7 @@ class UnderwaterLineFollowerNode(Node):
             self.lost_counter += 1
 
             if self.lost_counter < self.p['max_lost_frames'] // 2:
-                # RECOVERING: son bilinen yöne doğru hafif dön
+                # RECOVERING: son bilinen yöne doğru dön
                 self.state = self.STATE_RECOVERING
                 direction = np.sign(self.last_error) if self.last_error != 0 else 1.0
                 twist.linear.x  = 0.0
@@ -644,8 +644,9 @@ class UnderwaterLineFollowerNode(Node):
             elif self.lost_counter < self.p['max_lost_frames']:
                 # SEARCHING: aktif arama dönüşü
                 self.state = self.STATE_SEARCHING
+                direction = np.sign(self.last_error) if self.last_error != 0 else 1.0
                 twist.linear.x  = 0.0
-                twist.angular.z = self.p['search_angular_z']
+                twist.angular.z = direction * self.p['search_angular_z']
                 # PID sıfırla (integral birikmesin)
                 self.lateral_pid.reset()
                 self.angle_pid.reset()

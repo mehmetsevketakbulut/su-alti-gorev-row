@@ -724,7 +724,7 @@ class AutonomousDriverNode(Node):
             angular_angle = self.angle_pid.compute(angle_error)
 
             fwd_cmd = self.p['linear_speed']
-            yaw_cmd = -(angular_lateral + angular_angle)
+            yaw_cmd = (angular_lateral + angular_angle)
 
             # ROS2 Twist (telemetri/kayıt için)
             twist.linear.x = fwd_cmd
