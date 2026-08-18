@@ -90,6 +90,13 @@ class VideoPublisher(Node):
         return None
 
     def timer_callback(self):
+        if self.cap is None:
+            self.get_logger().warn("Kamera bulunamadı, yeniden aranıyor...")
+            import time
+            time.sleep(1)
+            self.cap = self._find_working_camera(0)
+            return
+
         ret, frame = self.cap.read()
         if ret:
             frame = cv2.resize(frame, (640, 480))
@@ -101,7 +108,13 @@ class VideoPublisher(Node):
                 self.get_logger().info("Video bitti, başa sarılıyor...")
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             else:
-                self.get_logger().warn("Kameradan kare okunamadi, baglanti bekleniyor...")
+                self.get_logger().warn("Kameradan kare okunamadi, kamera yeniden aranıyor...")
+                self.cap.release()
+                import time
+                time.sleep(1)
+                self.cap = self._find_working_camera(0)
+                if self.cap is None:
+                    self.get_logger().error("Kamera bulunamadı, bekleniyor...")
 
 def main(args=None):
     rclpy.init(args=args)
