@@ -256,14 +256,8 @@ class RovBridge(Node):
             m2 = int((fx + fy + fyaw) * 100)
             m3 = int((fx + fy - fyaw) * 100)
             m4 = int((fx - fy + fyaw) * 100)
-            
-            # YAZILIMSAL ROLL PID (Deneyap'taki donanımsal hata nedeniyle burada hesaplanıyor)
-            kp_roll = 1.5
-            # Eğer araç sağa yatıksa (roll > 0), m5(Sol) artmalı (Yukarı), m6(Sağ) azalmalı (Aşağı)
-            roll_correction = int(roll * kp_roll)
-            
-            m5 = int(fz * 100) + roll_correction
-            m6 = int(fz * 100) - roll_correction
+            m5 = int(fz * 100)
+            m6 = int(fz * 100)
 
         # Sinirla
         m1 = kirp(m1, -100, 100)
@@ -279,8 +273,7 @@ class RovBridge(Node):
         failsafe_flag = 0 if armed else 1
         
         # A,m1,m2,m3,m4,m5,m6,failsafe,role,miknatis,isik,roll,tilt,killswitch
-        # Deneyap'in icindeki bozuk PID'yi kapatmak icin roll=0 gonderiyoruz!
-        mesaj = f"A,{m1},{m2},{m3},{m4},{m5},{m6},{failsafe_flag},{role},{mag},{l_a},0,{tilt},{k_sw}\n"
+        mesaj = f"A,{m1},{m2},{m3},{m4},{m5},{m6},{failsafe_flag},{role},{mag},{l_a},{roll},{tilt},{k_sw}\n"
 
         try:
             self.ser.write(mesaj.encode('utf-8'))
