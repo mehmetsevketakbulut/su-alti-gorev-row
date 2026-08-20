@@ -88,7 +88,26 @@ void setup() {
   mcp2515.setNormalMode();
 }
 
+unsigned long a0BaslangicZamani = 0;
+bool a0ZamanlayiciBasladi = false;
+
 void loop() {
+  // --- ANALOG HALL SENSÖR (A0) YEDEK KILL SWITCH ---
+  int okunanDeger = analogRead(A0);
+  if (okunanDeger > 2800) {
+    if (!a0ZamanlayiciBasladi) {
+      a0BaslangicZamani = millis();
+      a0ZamanlayiciBasladi = true;
+    } else {
+      if (millis() - a0BaslangicZamani >= 1800) {
+        anaSalteriIndir(); // 1.8 saniye doldu, sistemi tamamen ve kalıcı olarak kapat
+      }
+    }
+  } else {
+    a0ZamanlayiciBasladi = false;
+  }
+  // ------------------------------------------------
+
   bool anlikHall = digitalRead(PIN_HALL_OKUMA);
   
   if (anlikHall != sonHallDurumu) {
