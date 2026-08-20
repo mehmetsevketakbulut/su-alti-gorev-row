@@ -781,8 +781,9 @@ class AutonomousDriverNode(Node):
             elif self.lost_counter < self.p['max_lost_frames']:
                 # ── SEARCHING: Aktif arama dönüşü ────────────────────
                 self.state = self.STATE_SEARCHING
+                direction = np.sign(self.last_error) if self.last_error != 0 else 1.0
                 fwd_cmd = 0.0
-                yaw_cmd = self.p['search_angular_z']
+                yaw_cmd = direction * self.p['search_angular_z']
                 self.lateral_pid.reset()
                 self.angle_pid.reset()
                 self.pitch_pid.reset()

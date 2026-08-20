@@ -284,7 +284,8 @@ def main():
                     magnet_evt = 1 if magnet_evt == 0 else 0
                     mod, kamera_role = 2, 1
                 elif b == BTN_X:
-                    kamera_role = 0 if kamera_role else 1
+                    kill_switch = 1 if kill_switch == 0 else 0
+                    print(f"[JOYSTICK] X (Kare) basildi -> KILL SWITCH: {kill_switch}")
                 elif b == BTN_A:
                     f, ok = cam.read()
                     if ok:
@@ -312,10 +313,10 @@ def main():
                 raw_rx = joy.get_axis(3)
                 raw_ry = joy.get_axis(4)
                 
-                fwd = int(-raw_ly * 100)
-                strafe = int(raw_lx * 100)
-                dive = int(-raw_ry * 100)
-                yaw = int(raw_rx * 100)
+                fwd = int(-raw_ly * 75)
+                strafe = int(raw_lx * 75)
+                dive = int(-raw_ry * 75)
+                yaw = int(raw_rx * 75)
                 
                 # Ekrana basarak PS4 trigger (L2/R2) sorunu var mi gormek icin
                 if seq % 20 == 0:
