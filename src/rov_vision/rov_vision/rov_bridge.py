@@ -236,7 +236,14 @@ class RovBridge(Node):
             # MINI ROV MODU
             m1 = m2 = m3 = m4 = m5 = m6 = 0 # Ana ROV dursun
             fs_mini = 0 if armed else 1
-            mesaj_mini = f"M,{vx},{vy},{vz},{yaw},{fs_mini},{l_m}\n"
+            
+            # Mini ROV 1000-2000 arasi PWM bekliyor, sira: batma, roll, donme, ileri
+            mini_y1 = kirp(int(1500 + fz * 500), 1000, 2000)   # Dive
+            mini_x1 = kirp(int(1500 + fy * 500), 1000, 2000)   # Strafe -> Roll
+            mini_x2 = kirp(int(1500 + fyaw * 500), 1000, 2000) # Yaw
+            mini_y2 = kirp(int(1500 + fx * 500), 1000, 2000)   # Fwd
+            
+            mesaj_mini = f"M,{mini_y1},{mini_x1},{mini_x2},{mini_y2},{fs_mini},{l_m}\n"
             try:
                 self.ser.write(mesaj_mini.encode('utf-8'))
                 self.ser.flush()
