@@ -99,8 +99,8 @@ void loop() {
       a0BaslangicZamani = millis();
       a0ZamanlayiciBasladi = true;
     } else {
-      if (millis() - a0BaslangicZamani >= 1800) {
-        anaSalteriIndir(); // 1.8 saniye doldu, sistemi tamamen ve kalıcı olarak kapat
+      if (millis() - a0BaslangicZamani >= 180) {
+        anaSalteriIndir(); // 180 milisaniye doldu, sistemi tamamen ve kalıcı olarak kapat
       }
     }
   } else {
